@@ -1,0 +1,2 @@
+C:\Program Files\Epic Games\UE_5.0
+C:\Program Files (x86)\Epic Games\UE_5.0
