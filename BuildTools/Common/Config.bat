@@ -40,3 +40,10 @@ echo Found engine in %ENGINE_PATH%
 
 set ENGINE_PATH=%ENGINE_PATH:"=%
 set UBT="%ENGINE_PATH%\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe"
+
+set "CURRENT_PATH=%cd%"
+for /D %%D in ("%CURRENT_PATH%") do (
+    set "PROJECT_PATH=%%~dpD"
+)
+
+set "EDITOR_PATH=%ENGINE_PATH%\Engine\Binaries\Win64\UnrealEditor.exe"
