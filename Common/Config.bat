@@ -47,3 +47,8 @@ for /D %%D in ("%CURRENT_PATH%") do (
 )
 
 set "EDITOR_PATH=%ENGINE_PATH%\Engine\Binaries\Win64\UnrealEditor.exe"
+
+REM Source: https://ss64.com/nt/echoansi.txt
+set _red=[31m
+Set _green=[32m
+set _reset=[0m
