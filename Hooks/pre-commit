@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# If any changes to source code for a Unreal Engine project are staged 
+# and about to be committed, check for modifications and deletions and
+# write this information to a file, which is then going to be read by
+# the build tool scripts to automatically trigger (clean) builds when
+# launching.
+
+# Grep all deleted files in the Source directory
+diff=$(git diff --name-status --cached | grep "Source/")
+changes=$(echo $diff | grep "M ")
+deletions=$(echo $diff | grep "D ")
+
+if [ "$deletions" != "" ]; then
+	echo "This commit will trigger a clean build for everyone who will pull it."
+	echo CleanBuild > Scripts/build_status.txt
+elif [ "$changes" != "" ]; then
+	echo "This commit will trigger a build for everyone who will pull it."
+	echo Build > Scripts/build_status.txt
+fi
