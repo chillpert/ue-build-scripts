@@ -17,7 +17,7 @@ set _yellow=[33m
 set _reset=[0m
 
 rem Initialize LFS
-git lfs install
+git lfs install --force
 if errorlevel 1 (
     echo %_red%
     echo Failed to initialize Git LFS. Please ask tech support for help.

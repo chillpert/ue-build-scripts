@@ -7,10 +7,10 @@ REM Fetch project information
 call %SCRIPTS_PATH%/Internal/Fetch.bat
 
 REM If build_status.txt has not been generated yet, we can just launch the project
-if not exist "%PROJECT_PATH%\Source\%BUILD_STATUS_FILE_NAME%" goto Run
+if not exist "%SCRIPTS_PATH%\%BUILD_STATUS_FILE_NAME%" goto Run
 
 REM Read the current build status
-set /p build_status=< "%PROJECT_PATH%\Source\%BUILD_STATUS_FILE_NAME%"
+set /p build_status=< "%SCRIPTS_PATH%\%BUILD_STATUS_FILE_NAME%"
 
 REM Check build status
 if "%build_status%" == "CleanBuild" goto CleanBuild

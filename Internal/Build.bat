@@ -23,5 +23,6 @@ if exist "%PROJECT_PATH%\Source\" (
     )
 
     REM Clear build status
-    echo None > "%PROJECT_PATH%\Source\%BUILD_STATUS_FILE_NAME%"
+    git update-index --assume-unchanged %GIT_ROOT_DIR%/Source/BuildStatus.txt
+    echo None > "%SCRIPTS_PATH%\%BUILD_STATUS_FILE_NAME%"
 )

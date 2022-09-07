@@ -19,6 +19,8 @@ echo %_reset%
 REM Search for engine using the paths in EnginePaths.txt
 set ENGINE_PATHS=%SCRIPTS_PATH%\EnginePaths.txt
 
+for /f %%i in ('git rev-parse --show-toplevel') do set GIT_ROOT_DIR=%%i
+
 for /F "usebackq delims=" %%a in ("%ENGINE_PATHS%") do (
     if exist %%a\ (
         set ENGINE_PATH=%%a
