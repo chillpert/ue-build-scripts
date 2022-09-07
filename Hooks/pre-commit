@@ -13,8 +13,8 @@ deletions=$(echo $diff | grep "D ")
 
 if [ "$deletions" != "" ]; then
 	echo "This commit will trigger a clean build for everyone who will pull it."
-	echo CleanBuild > Scripts/build_status.txt
+	echo CleanBuild > Source/BuildStatus.txt
 elif [ "$changes" != "" ]; then
 	echo "This commit will trigger a build for everyone who will pull it."
-	echo Build > Scripts/build_status.txt
+	echo Build > Source/BuildStatus.txt
 fi
