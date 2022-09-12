@@ -1,6 +1,6 @@
 # ue-build-scripts
 
-This is a collection of scripts for building a C++-based Unreal Engine project on Windows. The goal is to distribute a single script (`Launch.bat`) that everyone will run each time they want to launch the project. This script will also deploy two Git hooks which will analyze changes in source code and determined the new build instructions accordingly. For example, if you switched to a different branch that has added source files, the hooks will trigger compilation the next time the user runs `Launch.bat`.
+This is a collection of scripts for building a C++-based Unreal Engine project on Windows. The goal is to distribute a single script (`Launch.bat`) that everyone will run each time they want to launch the project. This script will also deploy two Git hooks which will analyze changes in source code and determine the new build instructions accordingly. For example, if you switched to a different branch that has added source files, the hooks will trigger compilation the next time the user runs `Launch.bat`.
 
 In other words, artists and designers won't ever have to manually (clean) build the project again. The script will do everything for them without wasting their time. Simultaneously, programmers don't have to inform others when they have to (clean) build or update submodules. It's also a great way to enforce Git-related configurations, e.g. a rebase-policy.
 
