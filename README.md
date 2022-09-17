@@ -10,6 +10,7 @@ The setup is supposed to be further simplified in the future.
 
 # Requirements
 
+- Unreal Engine 5
 - Git LFS 2.0
 - Windows 10 (11 was not tested yet)
 
