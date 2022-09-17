@@ -6,7 +6,7 @@ REM Do not run this script on its own.
 
 if exist "%PROJECT_PATH%\Source\" (
     echo %_yellow%
-    echo Compiling %PROJECT_NAME% ...
+    echo Compiling C++ ...
     echo %_reset%
 
     "%UBT_PATH%" Development Win64 -Project="%PROJECT_PATH%\%PROJECT_NAME%.uproject" -TargetType=Editor -Progress -NoEngineChanges -NoHotReloadFromIDE
@@ -26,3 +26,9 @@ if exist "%PROJECT_PATH%\Source\" (
     git update-index --assume-unchanged %GIT_ROOT_DIR%/Source/BuildStatus.txt
     echo None > "%SCRIPTS_PATH%\%BUILD_STATUS_FILE_NAME%"
 )
+
+echo %_yellow%
+echo Compiling all BPs ...%_reset%
+
+REM Launch a headless version of UnrealEditor that comiles all blueprints
+start /WAIT /MIN "UE-Headless-Compile-All-BPs" "%EDITOR_PATH%" "%PROJECT_PATH%\%PROJECT_NAME%.uproject" -run=CompileAllBlueprints -nullrhi
