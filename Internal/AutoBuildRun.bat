@@ -15,8 +15,8 @@ REM Read the current build status
 set /p build_status=< "%SCRIPTS_PATH%\%BUILD_STATUS_FILE_NAME%"
 
 REM Check build status
-if "%build_status%" == "CleanBuild" goto CleanBuild
-if "%build_status%" == "Build" goto Build
+if %build_status% == CleanBuild goto CleanBuild
+if %build_status% == Build goto Build
 
 goto Run
 
