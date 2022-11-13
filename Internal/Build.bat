@@ -27,8 +27,12 @@ if exist "%PROJECT_PATH%\Source\" (
     echo None > "%SCRIPTS_PATH%\%BUILD_STATUS_FILE_NAME%"
 )
 
+if %build_status% == None goto SkipBPCompile 
+
 echo %_yellow%
 echo Compiling all BPs ...%_reset%
 
 REM Launch a headless version of UnrealEditor that comiles all blueprints
 start /WAIT /MIN "UE-Headless-Compile-All-BPs" "%EDITOR_PATH%" "%PROJECT_PATH%\%PROJECT_NAME%.uproject" -run=CompileAllBlueprints -nullrhi
+
+:SkipBPCompile

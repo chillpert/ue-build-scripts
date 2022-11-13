@@ -16,9 +16,7 @@ set /p build_status=< "%SCRIPTS_PATH%\%BUILD_STATUS_FILE_NAME%"
 
 REM Check build status
 if %build_status% == CleanBuild goto CleanBuild
-if %build_status% == Build goto Build
-
-goto Run
+goto Build
 
 :CleanBuild
 call %SCRIPTS_PATH%/Internal/Clean.bat
