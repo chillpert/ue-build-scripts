@@ -52,7 +52,5 @@ echo Engine path:  %ENGINE_PATH%
 echo Editor path:  %EDITOR_PATH%
 echo UBT path:     %UBT_PATH%
 
-set BUILD_STATUS_FILE_NAME=BuildStatus.txt
-
 rem Determine path of project and project name
 call %SCRIPTS_PATH%/Internal/SetProjectPath.bat

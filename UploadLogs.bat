@@ -11,6 +11,7 @@ REM @NOTE: Currently this script is only guaranteed to work with the default
 REM installation explained in the readme.
 
 REM @NOTE: Modify this branch name to whatever you want to call your logging branch.
+REM        Please publish a branch of this name first before running the script!
 set BRANCH_NAME=junk/logs
 
 set SCRIPTS_PATH=%cd%
