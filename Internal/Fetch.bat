@@ -54,3 +54,6 @@ echo UBT path:     %UBT_PATH%
 
 rem Determine path of project and project name
 call %SCRIPTS_PATH%/Internal/SetProjectPath.bat
+
+rem Vendor / ThirdParty
+call %SCRIPTS_PATH%/Internal/Wwise.bat
