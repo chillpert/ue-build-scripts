@@ -14,4 +14,7 @@ if not exist "%PROJECT_PATH%\Plugins\Wwise\ThirdParty" (
     echo Simply re-launch this script again and you should be able to successfully compile Wwise.
     echo 
     echo %_reset%
+
+    pause
+    exit 1
 )
