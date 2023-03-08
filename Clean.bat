@@ -17,11 +17,11 @@ set _yellow=[33m
 set _reset=[0m
 
 REM Fetch project information
-call %SCRIPTS_PATH%/Internal/Fetch.bat
+call "%SCRIPTS_PATH%/Internal/Fetch.bat"
 
 REM Clean and refresh VS solution file
-call %SCRIPTS_PATH%/Internal/Clean.bat
-call %SCRIPTS_PATH%/Internal/GenerateProjectFiles.bat
+call "%SCRIPTS_PATH%/Internal/Clean.bat"
+call "%SCRIPTS_PATH%/Internal/GenerateProjectFiles.bat"
 
 echo %_yellow%
 echo Finished cleaning build files.

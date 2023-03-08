@@ -44,13 +44,13 @@ if errorlevel 1 (
     exit 1
 )
 
-call %SCRIPTS_PATH%/Internal/Fetch.bat
+call "%SCRIPTS_PATH%/Internal/Fetch.bat"
 
 rem Vendor / ThirdParty
-call %SCRIPTS_PATH%/Internal/Wwise.bat
+call "%SCRIPTS_PATH%/Internal/Wwise.bat"
 
-call %SCRIPTS_PATH%/Internal/Build.bat
+call "%SCRIPTS_PATH%/Internal/Build.bat"
 
-call %SCRIPTS_PATH%/Internal/Run.bat
+call "%SCRIPTS_PATH%/Internal/Run.bat"
 
 pause
