@@ -1,27 +1,29 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Author: github.com/chillpert
 
-# Define some colors
-red="\e[31m"
-yellow="\e[33m"
+# This script attempts to upload the engine log to a special branch in your Git repository that only includes log files.
+# Then it will generate a bug report template and automatically fill in the current commit as well as a link to the associated engine log.
 
-# @param1 - message
-# @param2 - color
-printHeader() {
-    banner="========================================================================================================="
-    echo -e "$2${banner}\n$1\n${banner}\e[0m\n"
-}
+source "$(pwd)/Library.sh"
+
+# @NOTE: Modify this to match your desired branch to store log files.
+branchName="junk/logs"
 
 uploadEngineLogs() {
     printHeader "Uploading engine log" "${yellow}"
+
+    cd "$projectPath"
+    git ls-remote --exit-code --heads origin $branchName
+    if [ $? -ne 0 ]; then
+        throwError "Failed to upload engine log: The branch $branchName does not exist on the remote. Please create it first and try again."
+    fi
+    cd - 1> /dev/null
 
     scriptsPath="basename $(pwd)"
     projectPath="$(cd .. && pwd)"
 
     projectName=$(cd .. && basename $(pwd))
     logFile="../Saved/Logs/${projectName}.log"
-
-    branchName="junk/logs"
 
     # Retrieve GitHub url of game repo
     remoteUrl=$(cd .. && git remote get-url origin)
@@ -68,8 +70,6 @@ $(git config --get remote.origin.url | sed -e 's/\.git$//g')/commit/$(git rev-pa
     echo
 }
 
-uploadEngineLogs
-
 # @NOTE: Requires uploadEngineLogs to be run before executing this function
 generateBugReport () {
     printHeader "Generating bug report and copying to clipboard ..." "${yellow}"
@@ -77,7 +77,7 @@ generateBugReport () {
     cd ..
     commitInfo="$(git log -1 --oneline)
 $(git config --get remote.origin.url | sed -e 's/\.git$//g')/commit/$(git rev-parse HEAD)"
-    cd -
+    cd - 1> /dev/null
 
     echo "### Description:
 *[Optional] If the title is not enough add more information here.*
@@ -97,11 +97,10 @@ $(git config --get remote.origin.url | sed -e 's/\.git$//g')/commit/$(git rev-pa
 ${commitInfo}
 
 ### Logs:
-${logCommitInfo}" | tee /dev/tty | clip
-
-    echo
+${logCommitInfo}" | clip
 }
 
+uploadEngineLogs
 generateBugReport
 
 read -p "Press ENTER to resume ..."

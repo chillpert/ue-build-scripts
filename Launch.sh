@@ -1,13 +1,14 @@
-# Initialize LFS
-git lfs install
+#!/usr/bin/env bash
+# Author: github.com/chillpert
 
-# Set rebase policy
-git config pull.rebase true
+# This script is your all-in-one solution to verify, build, and run your project.
 
-# Load Git aliases
-git config include.path "../.gitalias"
+source "$(pwd)/Library.sh"
 
-# Checkout all submodules
-git submodule update --init --recursive
+checkDependencies
+prepare
+fetch
+build
+run
 
-~/.local/bin/ue4 build && ~/.local/bin/ue4 run
+sleep 2.5
