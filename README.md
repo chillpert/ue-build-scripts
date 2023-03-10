@@ -6,8 +6,7 @@ Simply take a look at `Library.sh` and modify it to match your own needs.
 
 ### Features
 
-- verify installation of Git, Git-LFS, Unreal Engine, and other dependencies
-- automatically download missing dependencies
+- verify installation of Git, Git-LFS, Unreal Engine, VS, DotNet, and other dependencies
 - enforce global project settings on all machines
 - build and launch your C++-based Unreal Engine project
 - automatically push the engine log to a special branch so others can easily take a look at it
