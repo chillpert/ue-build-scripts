@@ -180,7 +180,6 @@ fetch() {
     # Windows
     elif [ "$platform" = "Windows" ]; then
         # Use registry to find install location
-        # enginePath=$(cmd.exe /c "powershell -command \"& { (Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\\$engineVersion' -Name 'InstalledDirectory' ).'InstalledDirectory' }\"")
         enginePath=$(powershell -command "powershell -command \"& { (Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\5.1' -Name 'InstalledDirectory' ).'InstalledDirectory' }\"")
 
         enginePath="${enginePath//\\//}"
@@ -269,7 +268,7 @@ run() {
 }
 
 uploadEngineLogs() {
-    printHeader "Uploading engine log" "${yellow}"
+    printHeader "Uploading engine log"
 
     cd "$projectPath"
     git ls-remote --exit-code --heads origin $branchName
@@ -284,6 +283,10 @@ uploadEngineLogs() {
     projectName=$(cd .. && basename $(pwd))
     logFile="../Saved/Logs/${projectName}.log"
 
+    if ! [[ -f "$logFile" ]]; then
+        throwError "No engine log has been created yet."
+    fi
+
     # Retrieve GitHub url of game repo
     remoteUrl=$(cd .. && git remote get-url origin)
 
@@ -291,7 +294,10 @@ uploadEngineLogs() {
     stagingDir="${projectName}_logs_staging"
 
     # Clone single orphan branch called ${branchName}
-    git clone --single-branch --depth=1 --branch ${branchName} ${remoteUrl} ${stagingDir}
+    git clone --single-branch --depth=1 --branch "$branchName" "$remoteUrl" "$stagingDir"
+    if [ $? -ne 0 ]; then
+        throwError "Failed to clone orphan branch $branchName"
+    fi
 
     # Retrieve current time
     localTime=$(date)
@@ -303,10 +309,10 @@ uploadEngineLogs() {
     mkdir -p "${stagingDir}/Logs"
 
     # Copy the log file
-    cp "${logFile}" "${stagingDir}/Logs/${gitUserName}_${localTime}"
+    cp "$logFile" "${stagingDir}/Logs/${gitUserName}_${localTime}"
 
     # Enter the directory of the orphan branch
-    cd "${stagingDir}"
+    cd "$stagingDir"
 
     # Make sure the local orphan branch is up to date
     git pull --rebase
@@ -324,14 +330,14 @@ $(git config --get remote.origin.url | sed -e 's/\.git$//g')/commit/$(git rev-pa
     cd -
 
     # Delete the local folder of the orphan branch
-    rm -rf ${stagingDir}
+    rm -rf $stagingDir
 
     echo
 }
 
 # @NOTE: Requires uploadEngineLogs to be run before executing this function
 generateBugReport () {
-    printHeader "Generating bug report and copying to clipboard ..." "${yellow}"
+    printHeader "Generating bug report and copying to clipboard ..."
 
     cd ..
     commitInfo="$(git log -1 --oneline)
