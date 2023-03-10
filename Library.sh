@@ -183,8 +183,7 @@ fetch() {
     # Windows
     elif [ "$platform" = "Windows" ]; then
         # Use registry to find install location
-        enginePath=$(powershell -command "powershell -command \"& { (Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\5.1' -Name 'InstalledDirectory' ).'InstalledDirectory' }\"")
-
+        enginePath="$(powershell -command "(Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\\$engineVersion' -Name 'InstalledDirectory' ).'InstalledDirectory'")"
         enginePath="${enginePath//\\//}"
     else
         throwError "This platform is not supported."
