@@ -222,8 +222,6 @@ build() {
             if [ $? -ne 0 ]; then
                 throwError "Failed to generate project files ..."
             fi
-
-            echo
         fi
 
         printHeader "Compiling C++ ..."
@@ -282,11 +280,7 @@ uploadEngineLogs() {
     fi
     cd - 1> /dev/null
 
-    scriptsPath="basename $(pwd)"
-    projectPath="$(cd .. && pwd)"
-
-    projectName=$(cd .. && basename $(pwd))
-    logFile="../Saved/Logs/${projectName}.log"
+    logFile="${projectPath}/Saved/Logs/${projectName}.log"
 
     if ! [[ -f "$logFile" ]]; then
         throwError "No engine log has been created yet."
