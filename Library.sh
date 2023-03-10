@@ -63,6 +63,7 @@ throwError() {
     exit 1
 }
 
+# @NOTE: This is very specific so most likely you won't need this.
 verifyWwiseInstallation() {
     if ! [[ -d "$projectPath/Plugins/Wwise/ThirdParty" ]]; then
         printError "You are missing some Wwise files"
