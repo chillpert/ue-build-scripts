@@ -15,7 +15,7 @@ projectPath="$(cd .. && pwd)"
 ue4cli="~/.local/bin/ue4"
 
 scriptsPath="$(pwd)"
-projectName="$(basename \"$projectPath\")"
+projectName=$(basename "$projectPath")
 
 getPlatform() {
     if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
@@ -76,10 +76,30 @@ verifyWwiseInstallation() {
 }
 
 verifyVisualStudioVersion() {
+    # @NOTE: Modify this value
+    desiredVsVersion="2022"
+
     vsVersion="$(./vswhere.exe -property catalog_productLineVersion)"
 
-    if ! [[ "$vsVersion" = "2022" ]]; then
+    if ! [[ "$vsVersion" = "$desiredVsVersion" ]]; then
         throwError "Please install Visual Studio Community 2022 and try again."
+    fi
+}
+
+verifyDotNetVersion() {
+    # @NOTE: Modify this value
+    desiredDotNetVersion=6
+
+    if ! [ -x "$(command -v dotnet)" ]; then
+        throwError "Please install DotNet $desiredDotNetVersion.x.x or higher and try again."
+    else
+        # @TODO: String to int comparisons should be simpler than this!
+        dotNetVersion="$(dotnet --version)"
+        dotNetVersion=${dotNetVersion%.*}
+        dotNetVersion=${dotNetVersion%.*}
+        if [ $dotNetVersion -lt $desiredDotNetVersion ]; then
+            throwError "Please update your DotNet installation to version $desiredDotNetVersion.x.x or higher and try again."
+        fi
     fi
 }
 
@@ -105,9 +125,13 @@ checkDependencies() {
         fi
     fi
 
+    # Check if VS 2022 is installed (Windows only)
     if [ "$platform" = "Windows" ]; then
         verifyVisualStudioVersion
     fi
+
+    # Check if DotNet 6.x.x or higher is installed
+    verifyDotNetVersion
 
     # Check if Wwise SDK binaries exist
     verifyWwiseInstallation
