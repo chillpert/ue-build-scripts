@@ -222,6 +222,8 @@ build() {
             if [ $? -ne 0 ]; then
                 throwError "Failed to generate project files ..."
             fi
+
+            echo
         fi
 
         printHeader "Compiling C++ ..."
