@@ -15,7 +15,7 @@ projectPath="$(cd .. && pwd)"
 ue4cli="~/.local/bin/ue4"
 
 scriptsPath="$(pwd)"
-projectName="$(basename $projectPath)"
+projectName="$(basename \"$projectPath\")"
 
 getPlatform() {
     if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
