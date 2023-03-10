@@ -11,6 +11,12 @@ engineVersion="5.1"
 #        of the game's root directory.
 projectPath="$(cd .. && pwd)"
 
+# @NOTE: Your desired minimum Visual Studio product line version
+desiredVsVersion="2022"
+
+# @NOTE: The minimum DotNet major version required by UE5
+desiredDotNetVersion=6
+
 # For Linux users only (change here if you are using a wrapper for ue4cli)
 ue4cli="~/.local/bin/ue4"
 
@@ -76,9 +82,6 @@ verifyWwiseInstallation() {
 }
 
 verifyVisualStudioVersion() {
-    # @NOTE: Modify this value
-    desiredVsVersion="2022"
-
     vsVersion="$(./vswhere.exe -property catalog_productLineVersion)"
 
     if ! [[ "$vsVersion" = "$desiredVsVersion" ]]; then
@@ -87,8 +90,6 @@ verifyVisualStudioVersion() {
 }
 
 verifyDotNetVersion() {
-    # @NOTE: Modify this value
-    desiredDotNetVersion=6
 
     if ! [ -x "$(command -v dotnet)" ]; then
         throwError "Please install DotNet $desiredDotNetVersion.x.x or higher and try again."
