@@ -75,6 +75,14 @@ verifyWwiseInstallation() {
     fi
 }
 
+verifyVisualStudioVersion() {
+    vsVersion="$(./vswhere.exe -property catalog_productLineVersion)"
+
+    if ! [[ "$vsVersion" = "2022" ]]; then
+        throwError "Please install Visual Studio Community 2022 and try again."
+    fi
+}
+
 checkDependencies() {
     printHeader "Checking dependencies"
 
@@ -95,6 +103,10 @@ checkDependencies() {
         if ! [ -x "$(command -v $ue4cli)" ]; then
             throwError "Please install ue4-cli."
         fi
+    fi
+
+    if [ "$platform" = "Windows" ]; then
+        verifyVisualStudioVersion
     fi
 
     # Check if Wwise SDK binaries exist
