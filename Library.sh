@@ -17,10 +17,10 @@ desiredVsVersion="2022"
 # @NOTE: The minimum DotNet major version required by UE5
 desiredDotNetVersion=6
 
-# For Linux users only (change here if you are using a wrapper for ue4cli)
-ue4cli="~/.local/bin/ue4"
+# @NOTE: Linux users must provide the path to their UE5 installation in a variable called 'UE_PATH'
+#        Add 'export UE_Path="/my/path/to/UE"' to your '.bashrc' or '.zshrc'
 
-# @NOTE: Modify this to match your desired branch to store log files. This is r
+# @NOTE: See 'GenerateBugReport.sh'. Set this variable there instead.
 branchName="junk/logs"
 
 scriptsPath="$(pwd)"
@@ -30,7 +30,7 @@ getPlatform() {
     if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
         platform="Linux"
     elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW64_NT" ]; then
-        platform="Windows"
+        platform="Win64"
     else
         throwError "This platform is not supported."
     fi
@@ -126,20 +126,13 @@ checkDependencies() {
 
     getPlatform
 
-    # ue4-cli for Linux
-    if [ "$platform" = "Linux" ]; then
-        if ! [ -x "$(command -v $ue4cli)" ]; then
-            throwError "Please install ue4-cli."
-        fi
-    fi
-
     # Check if VS 2022 is installed (Windows only)
-    if [ "$platform" = "Windows" ]; then
+    if [ "$platform" = "Win64" ]; then
         verifyVisualStudioVersion
-    fi
 
-    # Check if DotNet 6.x.x or higher is installed
-    verifyDotNetVersion
+        # Check if DotNet 6.x.x or higher is installed
+        verifyDotNetVersion
+    fi
 
     # Check if Wwise SDK binaries exist
     verifyWwiseInstallation
@@ -179,9 +172,13 @@ fetch() {
     # Determine where UE is installed on this machine (Windows only)
     # Linux
     if [ "$platform" = "Linux" ]; then
-        throwError "Linux support is not implemented yet."
+        enginePath="$UE_PATH"
+        if [ -z "$enginePath" ]; then
+            throwError "Please set the path to your UE5 installation in a variable called UE_PATH. Add 'export UE_PATH=/path/to/my/ue' in your '.bashrc' or '.zshrc' and reload your environment."
+        fi
+
     # Windows
-    elif [ "$platform" = "Windows" ]; then
+    elif [ "$platform" = "Win64" ]; then
         # Use registry to find install location
         enginePath="$(powershell -command "(Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\\$engineVersion' -Name 'InstalledDirectory' ).'InstalledDirectory'")"
         enginePath="${enginePath//\\//}"
@@ -193,8 +190,13 @@ fetch() {
         throwError "Please install Unreal Engine. If you have already installed it, please ask tech for help."
     fi
 
-    ubtPath="$enginePath/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe"
-    editorPath="$enginePath/Engine/Binaries/Win64/UnrealEditor.exe"
+    if [ "$platform" = "Win64" ]; then
+        editorPath="$enginePath/Engine/Binaries/Win64/UnrealEditor.exe"
+        ubtPath="$enginePath/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe"
+    elif [ "$platform" = "Linux" ]; then
+        editorPath="$enginePath/Engine/Binaries/Linux/UnrealEditor"
+        ubtPath="$enginePath/Engine/Build/BatchFiles/Linux/Build.sh"
+    fi
 
     echo "Engine path:    $enginePath"
     echo "Editor path:    $editorPath"
@@ -206,32 +208,26 @@ fetch() {
 }
 
 build() {
+    if [ -z "$platform" ]; then
+        throwError "This platform is not supported."
+    fi
+
     if [ -d "$projectPath/Source" ]; then
-        if ! [[ -d "$projectPath/Binaries" ]] || ! [[ -d "$projectPath/Intermediate" ]] || ! [[ -f "$projectPath/$projectName.sln" ]]; then
+        if ! [[ -d "$projectPath/Binaries" ]] || ! [[ -d "$projectPath/Intermediate" ]]; then
             printHeader "Generating project files ..."
 
-            if [ "$platform" = "Windows" ]; then
-                "$ubtPath" -projectFiles -Project="$projectPath/$projectName.uproject" -game -rocket -progress
-            elif [ "$platform" = "Linux" ]; then
-                $ue4cli gen
-            else
-                throwError "This platform is not supported."
-            fi
+            "$ubtPath" -projectFiles -Project="$projectPath/$projectName.uproject" -game -rocket -progress
 
             if [ $? -ne 0 ]; then
                 throwError "Failed to generate project files ..."
             fi
+
+            echo
         fi
 
         printHeader "Compiling C++ ..."
 
-        if [ "$platform" = "Windows" ]; then
-            "$ubtPath" Development Win64 -Project="$projectPath/$projectName.uproject" -TargetType=Editor -Progress -NoEngineChanges -NoHotReloadFromIDE
-        elif [ "$platform" = "Linux" ]; then
-            $ue4cli build
-        else
-            throwError "This platform is not supported."
-        fi
+        "$ubtPath" Development "$platform" -Project="$projectPath/$projectName.uproject" -TargetType=Editor -Progress -NoEngineChanges -NoHotReloadFromIDE
 
         if [ $? -ne 0 ]; then
             echo
@@ -256,10 +252,10 @@ run() {
     printHeader "Launching $projectName"
     echo "The editor might launch silently, so please give it a few minutes."
 
-    if [ "$platform" = "Windows" ]; then
+    if [ "$platform" = "Win64" ]; then
         "$editorPath" "$projectPath/$projectName.uproject" &
     elif [ "$platform" = "Linux" ]; then
-        cd "$projectPath" && $ue4cli run
+        "$editorPath" "$projectPath/$projectName.uproject" &
     else
         throwError "This platform is not supported."
     fi

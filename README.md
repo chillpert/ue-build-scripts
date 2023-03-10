@@ -11,7 +11,7 @@ Simply take a look at `Library.sh` and modify it to match your own needs.
 - build and launch your C++-based Unreal Engine project
 - automatically push the engine log to a special branch so others can easily take a look at it
 - generate automated bug reports that automatically link the relevant commit and engine log
-- [TODO] cross-platform support (on Linux using ue4cli)
+- Windows and Linux compatible
 
 ### Requirements
 
