@@ -153,7 +153,9 @@ prepare() {
     git config pull.rebase true
 
     # Load Git aliases
+    cd "$projectPath"
     git config include.path "../.gitalias"
+    cd -
 
     # Checkout all submodules
     git submodule update --init --recursive
