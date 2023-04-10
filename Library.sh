@@ -369,3 +369,27 @@ cleanBuildFiles() {
     printWarning "Now you may run 'Launch.sh' again."
     echo 
 }
+
+forceUnlockAll() {
+    read -p "This function will delete all uncomitted local changes. Are you sure that you want to proceed? [yN] (enter y to confirm)" -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit
+    fi
+
+    locks=$(echo "$(git lfs locks | grep -i $(git config user.name))" | awk '{print $1}')
+    if [ -z "$locks" ]; then
+        echo "Nothing to do"
+        exit
+    fi
+
+    echo "$locks" | while read line; do
+        mkdir -p $(dirname $line)
+        touch $line
+        git add $line -f
+    done
+
+    git commit -m "Remove locks"
+    git lfs unlock $(echo $locks)
+    git reset --hard HEAD~1
+}
