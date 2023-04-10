@@ -377,6 +377,8 @@ forceUnlockAll() {
         exit
     fi
 
+    cd "$projectPath"
+
     locks=$(echo "$(git lfs locks | grep -i $(git config user.name))" | awk '{print $1}')
     if [ -z "$locks" ]; then
         echo "Nothing to do"
@@ -392,4 +394,6 @@ forceUnlockAll() {
     git commit -m "Remove locks"
     git lfs unlock $(echo $locks)
     git reset --hard HEAD~1
+
+    cd -
 }
