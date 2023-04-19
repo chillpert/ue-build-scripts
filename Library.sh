@@ -26,6 +26,10 @@ branchName="junk/logs"
 scriptsPath="$(pwd)"
 projectName=$(basename "$projectPath")
 
+# Overwrite this variable after sourcing the library script to specify a different git-lfs executable.
+# For example, I am using the UEGitPlugin's custom git-lfs that can lock and unlock files in parallel.
+git_lfs_cmd="git lfs"
+
 getPlatform() {
     if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
         platform="Linux"
@@ -371,7 +375,7 @@ cleanBuildFiles() {
 }
 
 forceUnlockAll() {
-    read -p "This function will delete all uncomitted local changes. Are you sure that you want to proceed? [yN] (enter y to confirm)" -n 1 -r
+    read -p "This function will delete all uncomitted local changes. Are you sure that you want to proceed? [yN] (enter y to confirm) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit
@@ -379,7 +383,7 @@ forceUnlockAll() {
 
     cd "$projectPath"
 
-    locks=$(echo "$(git lfs locks | grep -i $(git config user.name))" | awk '{print $1}')
+    locks=$(echo "$($git_lfs_cmd locks | grep -i $(git config user.name))" | awk '{print $1}')
     if [ -z "$locks" ]; then
         echo "Nothing to do"
         exit
@@ -392,7 +396,7 @@ forceUnlockAll() {
     done
 
     git commit -m "Remove locks"
-    git lfs unlock $(echo $locks)
+    $git_lfs_cmd unlock $(echo $locks)
     git reset --hard HEAD~1
 
     cd -
