@@ -375,13 +375,18 @@ cleanBuildFiles() {
 }
 
 forceUnlockAll() {
+    if [ $# -ne 1 ]; then
+        echo "Please provide your project root directory as an argument."
+        exit
+    fi
+
     read -p "This function will delete all uncomitted local changes. Are you sure that you want to proceed? [yN] (enter y to confirm) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit
     fi
 
-    cd "$projectPath"
+    cd "$1"
 
     locks=$(echo "$($git_lfs_cmd locks | grep -i $(git config user.name))" | awk '{print $1}')
     if [ -z "$locks" ]; then
