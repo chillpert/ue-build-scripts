@@ -95,13 +95,12 @@ verifyVisualStudioVersion() {
         throwError "Failed to run vswhere.exe. Check if it exists in the same directory as 'Library.sh'"
     fi
 
-    if ! [[ "$vsVersion" = "$desiredVsVersion" ]]; then
+    if ! [[ "$vsVersion" = *"$desiredVsVersion"* ]]; then
         throwError "Please install Visual Studio Community 2022 and try again."
     fi
 }
 
 verifyDotNetVersion() {
-
     if ! [ -x "$(command -v dotnet)" ]; then
         throwError "Please install DotNet $desiredDotNetVersion.x.x or higher and try again."
     else
