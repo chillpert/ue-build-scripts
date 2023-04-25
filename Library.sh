@@ -242,7 +242,7 @@ build() {
             read -p "Do you want to upload your engine log? Press 'y' to confirm or any other key to cancel. " -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
-                "$scriptsPath/GenerateBugReport.sh"
+                uploadEngineLogs
                 exit 1
             else 
                 exit 1
@@ -278,7 +278,6 @@ uploadEngineLogs() {
     if [ $? -ne 0 ]; then
         throwError "Failed to upload engine log: The branch $branchName does not exist on the remote. Please create it first and try again."
     fi
-    cd - 1> /dev/null
 
     logFile="${projectPath}/Saved/Logs/${projectName}.log"
 
@@ -287,13 +286,15 @@ uploadEngineLogs() {
     fi
 
     # Retrieve GitHub url of game repo
-    remoteUrl=$(cd .. && git remote get-url origin)
+    remoteUrl=$(git remote get-url origin)
+
+    cd - 1> /dev/null
 
     # Assign a slightly unusual directory name to avoid conflicts and accidental deletion
     stagingDir="${projectName}_logs_staging"
 
     # Clone single orphan branch called ${branchName}
-    git clone --single-branch --depth=1 --branch "$branchName" "$remoteUrl" "$stagingDir"
+    git clone --single-branch --branch "$branchName" "$remoteUrl" "$stagingDir"
     if [ $? -ne 0 ]; then
         throwError "Failed to clone orphan branch $branchName"
     fi
