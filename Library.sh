@@ -4,7 +4,7 @@
 # This script simply provides several functions to use in other scripts.
 
 # @TODO: Automate by looking at ProjectName.uproject
-engineVersion="5.1"
+engineVersion="5.2"
 
 # @NOTE: Change this to match your game's root directory.
 #        In this case, the script repository is located directly inside
@@ -70,25 +70,6 @@ throwError() {
     exit 1
 }
 
-# @NOTE: This is very specific so most likely you won't need this.
-verifyWwiseInstallation() {
-    if ! [[ -d "$projectPath/Plugins/Wwise/ThirdParty" ]]; then
-        printError "You are missing some Wwise files"
-        echo
-        echo "Please download 'Wwise.zip' from our Google Drive under 'ThirdParty/Wwise/Wwise.zip' or use the link below."
-        echo "https://drive.google.com/drive/folders/1fpE5fukgSOYWELKkQLsyChV0LY0EglyL?usp=share_link"
-        echo
-        echo "Now extract the zip and you will get a folder called 'ThirdParty'."
-        echo "Place this folder in 'Plugins/Wwise'. This folder is located in the game's repository."
-        echo
-        echo "Simply re-launch this script again and you should be able to successfully compile Wwise."
-        echo 
-
-        waitForInput
-        exit 1
-    fi
-}
-
 verifyVisualStudioVersion() {
     vsVersion="$(./vswhere.exe -property catalog_productLineVersion)"
     if [ $? -ne 0 ]; then
@@ -136,9 +117,6 @@ checkDependencies() {
         # Check if DotNet 6.x.x or higher is installed
         verifyDotNetVersion
     fi
-
-    # Check if Wwise SDK binaries exist
-    verifyWwiseInstallation
 
     echo
 }
