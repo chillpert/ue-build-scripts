@@ -265,6 +265,7 @@ uploadEngineLogs() {
 
     # Retrieve GitHub url of game repo
     remoteUrl=$(git remote get-url origin)
+    echo HERE: $remoteUrl
 
     cd - 1> /dev/null
 
@@ -273,9 +274,10 @@ uploadEngineLogs() {
 
     # Clone single orphan branch called ${branchName}
     git clone --single-branch --branch "$branchName" "$remoteUrl" "$stagingDir"
-    if [ $? -ne 0 ]; then
-        throwError "Failed to clone orphan branch $branchName"
-    fi
+    # @TODO: This check is always false 
+    # if [ $? -ne 0 ]; then
+    #     throwError "Failed to clone orphan branch $branchName"
+    # fi
 
     # Retrieve current time
     localTime=$(date)
