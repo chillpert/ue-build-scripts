@@ -40,6 +40,16 @@ getPlatform() {
     fi
 }
 
+copyToClipboard() {
+    getPlatform
+
+    if [ "$platform" = "Win64" ]; then
+        echo "$1" | clip
+    elif [ "$platform" = "Linux" ]; then
+        echo "$1" | xclip -selection c
+    fi
+}
+
 waitForInput() {
     read -p "Press ENTER to continue ..."
 }
@@ -68,6 +78,24 @@ throwError() {
 
     waitForInput
     exit 1
+}
+
+fetchCustomGitLFS() {
+    getPlatform
+
+    if [ -d "Plugins/UEGitPlugin" ]; then
+        if [ "$platform" = "Win64" ]; then
+            if [ -f "Plugins/UEGitPlugin/git-lfs.exe" ]; then
+                git_lfs_cmd="Plugins/UEGitPlugin/git-lfs.exe"
+                printSuccess "Found custom LFS executable (Windows)"
+            fi
+        elif [ "$platform" = "Linux" ]; then
+            if [ -f "Plugins/UEGitPlugin/git-lfs" ]; then
+                git_lfs_cmd="Plugins/UEGitPlugin/git-lfs"
+                printSuccess "Found custom LFS executable (Linux)"
+            fi
+        fi
+    fi
 }
 
 verifyVisualStudioVersion() {
@@ -324,7 +352,7 @@ generateBugReport () {
 $(git config --get remote.origin.url | sed -e 's/\.git$//g')/commit/$(git rev-parse HEAD)"
     cd - 1> /dev/null
 
-    echo "### Description:
+    output="### Description:
 *[Optional] If the title is not enough add more information here.*
 
 ### Steps to reproduce:
@@ -342,7 +370,10 @@ $(git config --get remote.origin.url | sed -e 's/\.git$//g')/commit/$(git rev-pa
 ${commitInfo}
 
 ### Logs:
-${logCommitInfo}" | clip
+${logCommitInfo}"
+
+    copyToClipboard "$output"
+
 }
 
 cleanBuildFiles() {
@@ -354,7 +385,7 @@ cleanBuildFiles() {
     echo 
 }
 
-forceUnlockAll() {
+unlockAll() {
     if [ $# -ne 1 ]; then
         echo "Please provide your project root directory as an argument."
         exit
@@ -380,9 +411,92 @@ forceUnlockAll() {
         git add $line -f
     done
 
+    fetchCustomGitLFS
+
     git commit -m "Remove locks"
     $git_lfs_cmd unlock $(echo $locks)
     git reset --hard HEAD~1
 
+
+    copyToClipboard "git lfs lock \"$locks\" | clip"
+
     cd -
+}
+
+unlock_usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo "Options:"
+    echo " -a, --all        Removes all of your locks"
+    echo " -c, --clean      Removes all of your locks even if the associated file does not exist on the currently checked out branch (-c implies -a)"
+    echo " -f, --force      Removes all locks by force (for administrators only)"
+}
+
+unlock() {
+    # if [ $# -ne 1 ]; then
+    #     echo "Please provide your project root directory as an argument."
+    #     exit
+    # fi
+    
+    # Store unprocessed input parameters
+    input="$@"
+
+    # Try to check if custom LFS exists
+    fetchCustomGitLFS
+
+    # By default append unlock flag
+    git_lfs_cmd_internal="${git_lfs_cmd} unlock"
+
+    # Process possible flags
+    while [ $# -gt 0 ]; do
+        case $1 in
+            -h | --help)
+                unlock_usage
+                exit 0
+                ;;
+            -a | --all)
+                all="true"
+                ;;
+            -c | --clean*)
+                clean="true"
+                ;;
+            -f | --force*)
+                # Append force flag to our command
+                git_lfs_cmd_internal="${git_lfs_cmd_internal} --force"
+                ;;
+        esac
+        shift
+    done
+
+
+    # Handle unlocking all but also unlock non-existent files
+    if [[ -n "$clean" ]]; then
+        echo clean remove
+        unlockAll "$1"
+        exit
+    fi
+
+    # Handle unlocking all
+    if [[ -n "$all" ]]; then
+        echo "unlocking all ..."
+        locks="$($git_lfs_cmd locks | grep -i $(git config user.name) | awk '{print $1}')"
+
+        # Do not need to proceed if no locks exist
+        if [[ -z "$locks" ]]; then
+            echo "Nothing to do"
+            exit
+        fi
+
+        # Switch end of lines with white spaces
+        locks=$(echo "$locks" | tr -s '\n' ' ')
+
+        # Perform unlocking
+        eval "$git_lfs_cmd_internal" "$locks"
+        exit
+    fi
+
+    # Default: No flags were specified so assume all given inputs are files
+    echo "no flags found so going with default"
+    eval $git_lfs_cmd_internal "$input"
+    exit
+
 }
