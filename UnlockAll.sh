@@ -6,4 +6,4 @@
 
 source "$(pwd)/Library.sh"
 
-forceUnlockAll
+unlockAll
