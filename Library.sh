@@ -99,7 +99,7 @@ fetchCustomGitLFS() {
 }
 
 verifyVisualStudioVersion() {
-    vsVersion="$(./vswhere.exe -property catalog_productLineVersion)"
+    vsVersion="$(./ThirdParty/vswhere.exe -property catalog_productLineVersion)"
     if [ $? -ne 0 ]; then
         throwError "Failed to run vswhere.exe. Check if it exists in the same directory as 'Library.sh'"
     fi
@@ -431,6 +431,28 @@ unlock_usage() {
     echo " -f, --force      Removes all locks by force (for administrators only)"
 }
 
+lock() {
+    files_to_lock=""
+
+    # Only process any input that is a file
+    for file in "$@"
+    do
+        if [[ -f "$file" ]]; then
+            files_to_lock="${files_to_lock} $file"
+        fi
+    done
+
+    # Do not need to proceed if no locks exist
+    if [[ -z "$files_to_lock" ]]; then
+        echo "Nothing to do"
+        exit
+    fi
+
+    fetchCustomGitLFS
+
+    eval "$git_lfs_cmd" lock "$files_to_lock"
+}
+
 unlock() {
     # if [ $# -ne 1 ]; then
     #     echo "Please provide your project root directory as an argument."
@@ -467,7 +489,6 @@ unlock() {
         shift
     done
 
-
     # Handle unlocking all but also unlock non-existent files
     if [[ -n "$clean" ]]; then
         echo clean remove
@@ -494,9 +515,43 @@ unlock() {
         exit
     fi
 
-    # Default: No flags were specified so assume all given inputs are files
-    echo "no flags found so going with default"
-    eval $git_lfs_cmd_internal "$input"
-    exit
+    # Handle no input (launch fzf to allow for unlocking)
+    if [[ -z "$input" ]]; then
+        if [ "$platform" = "Win64" ]; then
+            fzf_cmd="Scripts/ThirdParty/fzf.exe"
+        elif [ "$platform" = "Linux" ]; then
+            fzf_cmd="Scripts/ThirdParty/fzf"
+        fi
 
+        # Get the users locked files via fzf
+        selected_files="$($git_lfs_cmd locks | grep -i $(git config user.name) | awk '{print $1}' | "$fzf_cmd" --multi)"
+        if [[ -n "$selected_files" ]]; then
+            # Switch end of lines with white spaces
+            selected_files=$(echo "$selected_files" | tr -s '\n' ' ')
+
+            eval "$git_lfs_cmd_internal" "$selected_files"
+            exit
+        fi
+
+        exit
+    fi
+
+    
+    # Only process any input that is a file
+    files_to_unlock=""
+
+    for file in ${input}; do
+        if [[ -f "$file" ]]; then
+            files_to_unlock="${files_to_unlock} $file"
+        fi
+    done
+
+    # Do not need to proceed if no locks exist
+    if [[ -z "$files_to_unlock" ]]; then
+        echo "Nothing to do"
+        exit
+    fi
+
+    # Default: No flags were specified so assume all given inputs are files
+    eval "$git_lfs_cmd_internal" "$files_to_unlock"
 }
