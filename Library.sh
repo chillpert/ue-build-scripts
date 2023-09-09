@@ -423,7 +423,7 @@ unlockAll() {
     cd -
 }
 
-unlock_usage() {
+unlockUsage() {
     echo "Usage: $0 [OPTIONS]"
     echo "Options:"
     echo " -a, --all        Removes all of your locks"
@@ -431,7 +431,67 @@ unlock_usage() {
     echo " -f, --force      Removes all locks by force (for administrators only)"
 }
 
+# In Git bash for windows, pipes and fzf do not work. This is a workaround from https://github.com/junegunn/fzf/issues/2798#issuecomment-1229376159
+fzfWinWrapper() {
+    set -eo pipefail
+
+    # @TODO: This will not work all the time as it assumes this repo to be checkout out in a folder called Scripts instead of the native repo name.
+    fzf="$(pwd)/Scripts/ThirdParty/fzf.exe"
+
+    prefix="$(basename "${BASH_SOURCE:-$0}")-${UID:-$(id -u)}"
+    tmpdir=$(mktemp -dp "${TMPDIR:-/tmp}" "${prefix}.XXXXX")
+    trap "rm -rf -- '${tmpdir}'" EXIT
+
+    args=
+    [[ $# -ge 1 ]] && args=$(printf ' %q' "$@")
+
+    if [[ -t 0 ]]; then
+        winpty </dev/tty >/dev/tty -- bash -c \
+            "command $fzf${args} >'${tmpdir}'/output"
+        cat "${tmpdir}"/output
+    else
+        cat - >"${tmpdir}"/input
+        winpty </dev/tty >/dev/tty -- bash -c \
+            "command $fzf${args} <'${tmpdir}'/input >'${tmpdir}'/output"
+        cat "${tmpdir}"/output
+    fi
+}
+
+fetchFzfCmd() {
+    getPlatform
+
+    if [ "$platform" = "Win64" ]; then
+        fzf_cmd="fzfWinWrapper"
+	    
+    elif [ "$platform" = "Linux" ]; then
+        fzf_cmd="Scripts/ThirdParty/fzf"
+    fi
+}
+
 lock() {
+    # Handle no input (launch fzf to allow for locking)
+    if [[ -z "$input" ]]; then
+        # Try to check if custom LFS exists
+        fetchCustomGitLFS
+
+        # By default append unlock flag
+        git_lfs_cmd_internal="${git_lfs_cmd} lock"
+
+        fetchFzfCmd
+
+        # Get all uassets in Content directory
+        selected_files="$(find Content/ -name '*.uasset' | awk '{print $1}' | "$fzf_cmd" --multi)"
+        if [[ -n "$selected_files" ]]; then
+            # Switch end of lines with white spaces
+            selected_files=$(echo "$selected_files" | tr -s '\n' ' ')
+
+            eval "$git_lfs_cmd_internal" "$selected_files"
+            exit
+        fi
+
+        exit
+    fi
+
     files_to_lock=""
 
     # Only process any input that is a file
@@ -472,7 +532,7 @@ unlock() {
     while [ $# -gt 0 ]; do
         case $1 in
             -h | --help)
-                unlock_usage
+                unlockUsage
                 exit 0
                 ;;
             -a | --all)
@@ -517,11 +577,7 @@ unlock() {
 
     # Handle no input (launch fzf to allow for unlocking)
     if [[ -z "$input" ]]; then
-        if [ "$platform" = "Win64" ]; then
-            fzf_cmd="Scripts/ThirdParty/fzf.exe"
-        elif [ "$platform" = "Linux" ]; then
-            fzf_cmd="Scripts/ThirdParty/fzf"
-        fi
+        fetchFzfCmd
 
         # Get the users locked files via fzf
         selected_files="$($git_lfs_cmd locks | grep -i $(git config user.name) | awk '{print $1}' | "$fzf_cmd" --multi)"
