@@ -161,6 +161,8 @@ prepare() {
     # Set rebase policy
     git config pull.rebase true
 
+    git config --global core.autocrlf false
+
     # Load Git aliases
     cd "$projectPath"
     git config include.path "../.gitalias"
