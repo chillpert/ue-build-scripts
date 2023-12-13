@@ -35,6 +35,8 @@ getPlatform() {
         platform="Linux"
     elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW64_NT" ]; then
         platform="Win64"
+    elif [ "$(expr substr $(uname -s) 1 10)" == "MSYS_NT-10" ]; then
+        platform="Win64"
     else
         throwError "This platform is not supported."
     fi
