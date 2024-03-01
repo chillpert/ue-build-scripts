@@ -163,7 +163,8 @@ prepare() {
     # Set rebase policy
     git config pull.rebase true
 
-    git config --global core.autocrlf false
+    # LF (Unix, Mac) - CRLF (Windows) policy
+    git config --global core.autocrlf true
 
     # Load Git aliases
     cd "$projectPath"
