@@ -101,7 +101,7 @@ fetchCustomGitLFS() {
 }
 
 verifyVisualStudioVersion() {
-    vsVersion="$(./ThirdParty/vswhere.exe -property catalog_productLineVersion)"
+    vsVersion="$(./ThirdParty/vswhere.exe -property catalog_productLineVersion -prerelease)"
     if [ $? -ne 0 ]; then
         throwError "Failed to run vswhere.exe. Check if it exists in the same directory as 'Library.sh'"
     fi
