@@ -154,28 +154,39 @@ checkDependencies() {
 prepare() {
     printHeader "Preparing repository ..."
 
+    cd "$projectPath"
+    
     # Initialize LFS
     git lfs install --force
     if [ $? -ne 0 ]; then
         throwError "Failed to initialize Git LFS. Please ask tech for help." 
     fi
-
+    
     # Set rebase policy
     git config pull.rebase true
 
     # LF (Unix, Mac) - CRLF (Windows) policy
-    git config --global core.autocrlf true
+    git config core.autocrlf true
+    
+    # Load custom git hooks
+    git config core.hooksPath ".githooks/"
+    if [ $? -ne 0 ]; then
+        throwError "Failed to set custom git hooks path. Please try updating your git installation."
+    fi
+    
+    # Make sure hooks are available
+    git lfs update --force
 
     # Load Git aliases
-    cd "$projectPath"
     git config include.path "../.gitalias"
-    cd -
 
     # Checkout all submodules
     git submodule update --init --recursive
     if [ $? -ne 0 ]; then
         throwError "Failed to update submodules. Please ask tech for help."
     fi
+    
+    cd -
 
     echo
 }
