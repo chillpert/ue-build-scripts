@@ -164,7 +164,13 @@ prepare() {
     git config pull.rebase true
 
     # LF (Unix, Mac) - CRLF (Windows) policy
-    git config --global core.autocrlf true
+    git config --local core.autocrlf true
+    
+    # Load custom git hooks
+    git config --local core.hooksPath .githooks/
+    if [ $? -ne 0 ]; then
+        throwError "Failed to set custom git hooks path. Please try updating your git installation."
+    fi
 
     # Load Git aliases
     cd "$projectPath"
