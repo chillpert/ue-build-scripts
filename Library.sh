@@ -169,7 +169,7 @@ prepare() {
     git config core.autocrlf true
     
     # Load custom git hooks
-    git config core.hooksPath ".githooks/"
+    git config core.hooksPath ".git/hooks"
     if [ $? -ne 0 ]; then
         throwError "Failed to set custom git hooks path. Please try updating your git installation."
     fi
