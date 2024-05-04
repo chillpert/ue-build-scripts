@@ -4,7 +4,7 @@
 # This script simply provides several functions to use in other scripts.
 
 # @TODO: Automate by looking at ProjectName.uproject
-engineVersion="5.3"
+engineVersion="5.4"
 
 # @NOTE: Change this to match your game's root directory.
 #        In this case, the script repository is located directly inside
