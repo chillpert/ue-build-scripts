@@ -6,4 +6,4 @@
 
 source "$(pwd)/Internal/Library.sh"
 
-unlockAll
+uebs::unlock_all

@@ -3,6 +3,6 @@
 
 source "$(pwd)/Internal/Library.sh"
 
-cleanBuildFiles
+uebs::clean_build_files
 
 waitForInput

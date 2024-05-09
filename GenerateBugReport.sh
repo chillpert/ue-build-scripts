@@ -6,10 +6,7 @@
 
 source "$(pwd)/Internal/Library.sh"
 
-# @NOTE: Modify this to match your desired branch to store log files.
-branchName="junk/logs"
-
-uploadEngineLogs
-generateBugReport
+uebs::upload_engine_logs
+uebs::generate_bug_report
 
 read -p "Press ENTER to resume ..."

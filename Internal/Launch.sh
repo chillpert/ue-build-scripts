@@ -5,10 +5,13 @@
 
 source "$(pwd)/Internal/Library.sh"
 
-checkDependencies
-prepare
-fetch
-build
-run
+# Execute all core-functions
+uebs::check_dependencies
+uebs::prepare
+uebs::update
+uebs::fetch
+uebs::build
+uebs::run
 
+# Wait a bit before closing
 sleep 2.5

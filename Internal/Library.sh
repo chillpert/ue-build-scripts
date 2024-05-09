@@ -24,7 +24,7 @@
 default_project_path="$(cd .. && pwd)"
 UEBS_PROJECT_PATH="${UEBS_PROJECT_PATH:-$default_project_path}"
 
-# @NOTE: The path to "ue-build-scripts". This depends on how you set up the repo. Make sure this is a full path and 
+# @NOTE: The path to "ue-build-scripts". This depends on how you set up the repo. Make sure this is a full path and
 #        not just relative.
 default_scripts_path="$(pwd)"
 UEBS_SCRIPTS_PATH="${UEBS_SCRIPTS_PATH:-$default_scripts_path}"
@@ -54,14 +54,20 @@ UEBS_LOG_BRANCH_NAME="${UEBS_LOG_BRANCH_NAME:-$default_log_branch_name}"
 default_git_lfs_command="git lfs"
 UEBS_GIT_LFS_COMMAND="${UEBS_GIT_LFS_COMMAND:-$default_git_lfs_command}"
 
+# @NOTE: You may want to specify
 default_git_hooks_path=".git/hooks"
 UEBS_GIT_HOOKS_PATH="${UEBS_GIT_HOOKS_PATH:-$default_git_hooks_path}"
+
+# @NOTE: The branch we consider the latest development version. This is the branch used for rebasing in the
+#        auto-update step.
+default_project_branch="main"
+UEBS_DEFAULT_PROJECT_BRANCH="${UEBS_DEFAULT_PROJECT_BRANCH:-$default_project_branch}"
 
 ######################################################################################################
 ###################################### Implementations ###############################################
 ######################################################################################################
 
-getPlatform() {
+uebs::get_platform() {
     if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
         platform="Linux"
     elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW64_NT" ]; then
@@ -69,12 +75,12 @@ getPlatform() {
     elif [ "$(expr substr $(uname -s) 1 10)" == "MSYS_NT-10" ]; then
         platform="Win64"
     else
-        throwError "This platform is not supported."
+        uebs::throw_error "This platform is not supported."
     fi
 }
 
-copyToClipboard() {
-    getPlatform
+uebs::copy_to_clipboard() {
+    uebs::get_platform
 
     if [ "$platform" = "Win64" ]; then
         echo "$1" | clip
@@ -83,132 +89,189 @@ copyToClipboard() {
     fi
 }
 
-waitForInput() {
+uebs::wait_for_input() {
     read -p "Press ENTER to continue ..."
 }
 
-printError() {
+uebs::print_error() {
     echo -e "\e[31m$1\e[0m"
 }
 
-printWarning() {
+uebs::print_warning() {
     echo -e "\e[33m$1\e[0m"
 }
 
-printSuccess() {
+uebs::print_success() {
     echo -e "\e[32m$1\e[0m"
 }
 
-printHeader() {
+uebs::print_header() {
     banner="=========================================="
     echo -e "\e[33m${banner}\n$1\n${banner}\e[0m\n"
 }
 
-throwError() {
+uebs::throw_error() {
     echo
-    printError "$1"
+    uebs::print_error "$1"
     echo
 
-    waitForInput
+    uebs::wait_for_input
     exit 1
 }
 
-fetchCustomGitLFS() {
-    getPlatform
+# @TODO: Remove because user should specify it via export
+uebs::fetch_custom_git_lfs() {
+    uebs::get_platform
 
     if [ -d "Plugins/UEGitPlugin" ]; then
         if [ "$platform" = "Win64" ]; then
             if [ -f "Plugins/UEGitPlugin/git-lfs.exe" ]; then
                 UEBS_GIT_LFS_COMMAND="Plugins/UEGitPlugin/git-lfs.exe"
-                printSuccess "Found custom LFS executable (Windows)"
+                uebs::print_success "Found custom LFS executable (Windows)"
             fi
         elif [ "$platform" = "Linux" ]; then
             if [ -f "Plugins/UEGitPlugin/git-lfs" ]; then
                 UEBS_GIT_LFS_COMMAND="Plugins/UEGitPlugin/git-lfs"
-                printSuccess "Found custom LFS executable (Linux)"
+                uebs::print_success "Found custom LFS executable (Linux)"
             fi
         fi
     fi
 }
 
-verifyVisualStudioVersion() {
+# @TODO: Add compiler version check?
+uebs::verify_vs_version() {
     vs_version="$(./ThirdParty/vswhere.exe -property catalog_productLineVersion -prerelease)"
     if [ $? -ne 0 ]; then
-        throwError "Failed to run vswhere.exe. Check if it exists in the same directory as 'Library.sh'"
+        uebs::throw_error "Failed to run vswhere.exe. Check if it exists in the same directory as 'Library.sh'"
     fi
 
     if ! [[ "$vs_version" = *"$UEBS_DESIRED_VS_VERSION"* ]]; then
-        throwError "Please install Visual Studio Community 2022 and try again."
+        uebs::throw_error "Please install Visual Studio Community 2022 and try again."
     fi
 }
 
-verifyDotNetVersion() {
+uebs::verify_dot_net_version() {
     if ! [ -x "$(command -v dotnet)" ]; then
-        throwError "Please install DotNet $UEBS_DESIRED_DOT_NET_VERSION.x.x or higher and try again."
+        uebs::throw_error "Please install DotNet $UEBS_DESIRED_DOT_NET_VERSION.x.x or higher and try again."
     else
         # @TODO: String to int comparisons should be simpler than this!
         dot_net_version="$(dotnet --version)"
         dot_net_version=${dot_net_version%.*}
         dot_net_version=${dot_net_version%.*}
         if [ $dot_net_version -lt $UEBS_DESIRED_DOT_NET_VERSION ]; then
-            throwError "Please update your DotNet installation to version $UEBS_DESIRED_DOT_NET_VERSION.x.x or higher and try again."
+            uebs::throw_error "Please update your DotNet installation to version $UEBS_DESIRED_DOT_NET_VERSION.x.x or higher and try again."
         fi
     fi
 }
 
-checkDependencies() {
-    printHeader "Checking dependencies ..."
+uebs::check_dependencies() {
+    uebs::print_header "Checking dependencies ..."
 
     # Git
     if ! [ -x "$(command -v git)" ]; then
-        throwError "Please install Git and try again."
+        uebs::throw_error "Please install Git and try again."
     fi
 
     # Git-LFS
     if ! [ -x "$(command -v git-lfs)" ]; then
-        throwError "Please install Git-LFS 2 and try again."
+        uebs::throw_error "Please install Git-LFS 2 and try again."
     fi
 
-    getPlatform
+    uebs::get_platform
 
     # Check if VS 2022 is installed (Windows only)
     if [ "$platform" = "Win64" ]; then
-        verifyVisualStudioVersion
+        uebs::verify_vs_version
 
         # Check if DotNet 6.x.x or higher is installed
-        verifyDotNetVersion
+        uebs::verify_dot_net_version
     fi
 
     echo
 }
 
-update() {
-    printHeader "Updating repository ..."
-}
-
-prepare() {
-    printHeader "Preparing repository ..."
+uebs::update() {
+    uebs::print_header "Updating repository ..."
 
     cd "$UEBS_PROJECT_PATH"
-    
+
+    current_branch="$(git rev-parse --abbrev-ref HEAD)"
+    echo "Current branch: $current_branch"
+    echo "Default branch: $UEBS_DEFAULT_PROJECT_BRANCH"
+
+    if [[ "$current_branch" == "$UEBS_DEFAULT_PROJECT_BRANCH" ]]; then
+        echo "Current branch is project default branch. Skipping auto-update ..."
+    else
+        echo "Updating $UEBS_DEFAULT_PROJECT_BRANCH ..."
+
+        # Update project branch without switching to it
+        git fetch origin $UEBS_DEFAULT_PROJECT_BRANCH:$UEBS_DEFAULT_PROJECT_BRANCH
+        if [ $? -ne 0 ]; then
+            uebs::throw_error "Failed to update project branch '$UEBS_DEFAULT_PROJECT_BRANCH'."
+        fi
+
+        # Check if project branch is ahead of current branch
+        if [[ $(git rev-list --count $current_branch..$UEBS_DEFAULT_PROJECT_BRANCH) -gt 0 ]]; then
+            # Ask user if they really want to update their branch
+            echo
+            uebs::print_warning "There are updates on $UEBS_DEFAULT_PROJECT_BRANCH. Would you like to update your branch? [y/N] "
+            read -p "Press 'y' to update, or 'n' to skip." -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo "Updating branch ..."
+                git rebase $UEBS_DEFAULT_PROJECT_BRANCH $current_branch
+                if [ $? -ne 0 ]; then
+                    git rebase --abort
+                    uebs::throw_error "Failed to update local branch. Try updating manually or ask tech for help."
+                fi
+
+                uebs::print_success "Successfully updated local branch."
+
+                # If there is no remote branch, there is no need to force-push
+                git show-branch remotes/origin/$current_branch >/dev/null 2>&1
+                if [ $? -ne 0 ]; then
+                    echo "Current branch has no remote. Skipping force push ..."
+                else
+                    git push --force-with-lease
+                    if [ $? -ne 0 ]; then
+                        uebs::throw_error "Failed to force push current branch. Ask tech for help."
+                    fi
+                fi
+            fi
+        else
+            echo "Current branch '$current_branch' is up to date with '$UEBS_DEFAULT_PROJECT_BRANCH'"
+        fi
+    fi
+
+    cd - 1>/dev/null
+
+    echo
+}
+
+uebs::prepare() {
+    uebs::print_header "Preparing repository ..."
+
+    cd "$UEBS_PROJECT_PATH"
+
     # Initialize LFS
     git lfs install --force
     if [ $? -ne 0 ]; then
-        throwError "Failed to initialize Git LFS. Please ask tech for help." 
+        uebs::throw_error "Failed to initialize Git LFS. Please ask tech for help."
     fi
-    
+
     # Set rebase policy
     git config pull.rebase true
 
     # LF (Unix, Mac) - CRLF (Windows) policy
+    # @NOTE: Please use .gitattributes in your repo instead
     git config core.autocrlf true
-    
+
     # Load custom git hooks
     git config core.hooksPath "$UEBS_GIT_HOOKS_PATH"
     if [ $? -ne 0 ]; then
-        throwError "Failed to set git hooks path. Please try updating your git installation."
+        uebs::throw_error "Failed to set git hooks path. Please try updating your git installation."
     fi
-    
+
     # Make sure hooks are available
     # @TODO: This overwrites any custom hooks
     git lfs update --force
@@ -217,19 +280,19 @@ prepare() {
     git config include.path "../.gitalias"
 
     # Checkout all submodules
-    # git submodule update --init --recursive
-    # if [ $? -ne 0 ]; then
-    #     throwError "Failed to update submodules. Please ask tech for help."
-    # fi
-    
-    cd -
+    git submodule update --init --recursive
+    if [ $? -ne 0 ]; then
+        uebs::throw_error "Failed to update submodules. Please ask tech for help."
+    fi
+
+    cd - 1>/dev/null
 
     echo
 }
 
-fetch() {
-    printHeader "Fetching project information ..."
-    
+uebs::fetch() {
+    uebs::print_header "Fetching project information ..."
+
     # @TODO: Consider parsing .uproject file to extract engine version
 
     # Determine where UE is installed on this machine (Windows only)
@@ -237,7 +300,7 @@ fetch() {
     if [ "$platform" = "Linux" ]; then
         engine_path="$UE_PATH_LINUX"
         if [ -z "$engine_path" ]; then
-            throwError "Please set the path to your UE5 installation in a variable called UE_PATH_LINUX. Add 'export UE_PATH_LINUX=/path/to/my/ue' in your '.bashrc' or '.zshrc' and reload your environment."
+            uebs::throw_error "Please set the path to your UE5 installation in a variable called UE_PATH_LINUX. Add 'export UE_PATH_LINUX=/path/to/my/ue' in your '.bashrc' or '.zshrc' and reload your environment."
         fi
 
     # Windows
@@ -246,11 +309,11 @@ fetch() {
         engine_path="$(powershell -command "(Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\\$UEBS_ENGINE_VERSION' -Name 'InstalledDirectory' ).'InstalledDirectory'")"
         engine_path="${engine_path//\\//}"
     else
-        throwError "This platform is not supported."
+        uebs::throw_error "This platform is not supported."
     fi
 
     if [ -z "$engine_path" ]; then
-        throwError "Please install Unreal Engine. If you have already installed it, please ask tech for help."
+        uebs::throw_error "Please install Unreal Engine. If you have already installed it, please ask tech for help."
     fi
 
     if [ "$platform" = "Win64" ]; then
@@ -270,49 +333,49 @@ fetch() {
     echo
 }
 
-build() {
+uebs::build() {
     if [ -z "$platform" ]; then
-        throwError "This platform is not supported."
+        uebs::throw_error "This platform is not supported."
     fi
 
     if [ -d "$UEBS_PROJECT_PATH/Source" ]; then
         if ! [[ -d "$UEBS_PROJECT_PATH/Binaries" ]] || ! [[ -d "$UEBS_PROJECT_PATH/Intermediate" ]]; then
-            printHeader "Generating project files ..."
+            uebs::print_header "Generating project files ..."
 
             "$ubt_path" -projectFiles -Project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -game -rocket -progress
 
             if [ $? -ne 0 ]; then
-                throwError "Failed to generate project files ..."
+                uebs::throw_error "Failed to generate project files ..."
             fi
 
             echo
         fi
 
-        printHeader "Compiling C++ ..."
+        uebs::print_header "Compiling C++ ..."
 
         "$ubt_path" Development "$platform" -Project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -TargetType=Editor -Progress -NoEngineChanges -NoHotReloadFromIDE
 
         if [ $? -ne 0 ]; then
             echo
-            printError "Failed to compile $UEBS_PROJECT_NAME." 
-            echo 
+            uebs::print_error "Failed to compile $UEBS_PROJECT_NAME."
+            echo
 
             read -p "Do you want to upload your engine log? Press 'y' to confirm or any other key to cancel. " -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
-                uploadEngineLogs
+                uebs::upload_engine_logs
                 exit 1
-            else 
+            else
                 exit 1
             fi
         fi
     fi
-    
+
     echo
 }
 
-run() {
-    printHeader "Launching $UEBS_PROJECT_NAME ..."
+uebs::run() {
+    uebs::print_header "Launching $UEBS_PROJECT_NAME ..."
     echo "The editor might launch silently, so please give it a few minutes."
 
     if [ "$platform" = "Win64" ]; then
@@ -320,43 +383,43 @@ run() {
     elif [ "$platform" = "Linux" ]; then
         "$editor_path" "$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" &
     else
-        throwError "This platform is not supported."
+        uebs::throw_error "This platform is not supported."
     fi
 
     if [ $? -ne 0 ]; then
-        throwError "Failed to launch UnrealEditor."
+        uebs::throw_error "Failed to launch UnrealEditor."
     fi
 }
 
-uploadEngineLogs() {
-    printHeader "Uploading engine log"
+uebs::upload_engine_logs() {
+    uebs::print_header "Uploading engine log"
 
     cd "$UEBS_PROJECT_PATH"
     git ls-remote --exit-code --heads origin "$UEBS_LOG_BRANCH_NAME"
     if [ $? -ne 0 ]; then
-        throwError "Failed to upload engine log: The branch $UEBS_LOG_BRANCH_NAME does not exist on the remote. Please create it first and try again."
+        uebs::throw_error "Failed to upload engine log: The branch $UEBS_LOG_BRANCH_NAME does not exist on the remote. Please create it first and try again."
     fi
 
     log_file="${UEBS_PROJECT_PATH}/Saved/Logs/${UEBS_PROJECT_NAME}.log"
 
     if ! [[ -f "$log_file" ]]; then
-        throwError "No engine log has been created yet."
+        uebs::throw_error "No engine log has been created yet."
     fi
 
     # Retrieve GitHub url of game repo
     remote_url=$(git remote get-url origin)
     echo "HERE: $remote_url"
 
-    cd - 1> /dev/null
+    cd - 1>/dev/null
 
     # Assign a slightly unusual directory name to avoid conflicts and accidental deletion
     staging_dir="${UEBS_PROJECT_NAME}_logs_staging"
 
     # Clone single orphan branch called ${UEBS_LOG_BRANCH_NAME}
     git clone --single-branch --branch "$UEBS_LOG_BRANCH_NAME" "$remote_url" "$staging_dir"
-    # @TODO: This check is always false 
+    # @TODO: This check is always false
     # if [ $? -ne 0 ]; then
-    #     throwError "Failed to clone orphan branch $UEBS_LOG_BRANCH_NAME"
+    #     uebs::throw_error "Failed to clone orphan branch $UEBS_LOG_BRANCH_NAME"
     # fi
 
     # Retrieve current time
@@ -387,7 +450,7 @@ uploadEngineLogs() {
 $(git config --get remote.origin.url | sed -e 's/\.git$//g')/commit/$(git rev-parse HEAD)"
 
     # Go back to the previous directory
-    cd -
+    cd - 1>/dev/null
 
     # Delete the local folder of the orphan branch
     rm -rf "$staging_dir"
@@ -395,14 +458,14 @@ $(git config --get remote.origin.url | sed -e 's/\.git$//g')/commit/$(git rev-pa
     echo
 }
 
-# @NOTE: Requires uploadEngineLogs to be run before executing this function
-generateBugReport () {
-    printHeader "Generating bug report and copying to clipboard ..."
+# @NOTE: Requires uebs::upload_engine_logs to be run before executing this function
+uebs::generate_bug_report() {
+    uebs::print_header "Generating bug report and copying to clipboard ..."
 
     cd ..
     commit_info="$(git log -1 --oneline)
 $(git config --get remote.origin.url | sed -e 's/\.git$//g')/commit/$(git rev-parse HEAD)"
-    cd - 1> /dev/null
+    cd - 1>/dev/null
 
     output="### Description:
 *[Optional] If the title is not enough add more information here.*
@@ -424,20 +487,20 @@ ${commit_info}
 ### Logs:
 ${log_commit_info}"
 
-    copyToClipboard "$output"
+    uebs::copy_to_clipboard "$output"
 
 }
 
-cleanBuildFiles() {
-    printHeader "Cleaning $UEBS_PROJECT_NAME build files ..."
+uebs::clean_build_files() {
+    uebs::print_header "Cleaning $UEBS_PROJECT_NAME build files ..."
 
     rm -rf "$UEBS_PROJECT_PATH/Binaries" "$UEBS_PROJECT_PATH/Intermediate" "$UEBS_PROJECT_PATH/*.sln"
 
-    printWarning "Now you may run 'Launch.sh' again."
-    echo 
+    uebs::print_warning "Now you may run 'Launch.sh' again."
+    echo
 }
 
-unlockAll() {
+uebs::unlock_all() {
     if [ $# -ne 1 ]; then
         echo "Please provide your project root directory as an argument."
         exit
@@ -463,19 +526,18 @@ unlockAll() {
         git add $line -f
     done
 
-    fetchCustomGitLFS
+    uebs::fetch_custom_git_lfs
 
     git commit -m "Remove locks"
-    $UEBS_GIT_LFS_COMMAND unlock $(echo $locks)
+    $UEBS_GIT_LFS_COMMAND uebs::unlock $(echo $locks)
     git reset --hard HEAD~1
 
+    uebs::copy_to_clipboard "git lfs lock \"$locks\" | clip"
 
-    copyToClipboard "git lfs lock \"$locks\" | clip"
-
-    cd -
+    cd - 1>/dev/null
 }
 
-unlockUsage() {
+uebs::unlock_usage() {
     echo "Usage: $0 [OPTIONS]"
     echo "Options:"
     echo " -a, --all        Removes all of your locks"
@@ -484,7 +546,7 @@ unlockUsage() {
 }
 
 # In Git bash for windows, pipes and fzf do not work. This is a workaround from https://github.com/junegunn/fzf/issues/2798#issuecomment-1229376159
-fzfWinWrapper() {
+uebs::fzf_win_wrapper() {
     set -eo pipefail
 
     # @TODO: This will not work all the time as it assumes this repo to be checkout out in a folder called Scripts instead of the native repo name.
@@ -509,27 +571,27 @@ fzfWinWrapper() {
     fi
 }
 
-fetchFzfCmd() {
-    getPlatform
+uebs::fetch_fzf_command() {
+    uebs::get_platform
 
     if [ "$platform" = "Win64" ]; then
-        fzf_cmd="fzfWinWrapper"
-	    
+        fzf_cmd="uebs::fzf_win_wrapper"
+
     elif [ "$platform" = "Linux" ]; then
         fzf_cmd="Scripts/ThirdParty/fzf"
     fi
 }
 
-lock() {
+uebs::lock() {
     # Handle no input (launch fzf to allow for locking)
     if [[ -z "$input" ]]; then
         # Try to check if custom LFS exists
-        fetchCustomGitLFS
+        uebs::fetch_custom_git_lfs
 
         # By default append unlock flag
         UEBS_GIT_LFS_COMMAND="${UEBS_GIT_LFS_COMMAND} lock"
 
-        fetchFzfCmd
+        uebs::fetch_fzf_command
 
         # Get all uassets in Content directory
         selected_files="$(find Content/ -name '*.uasset' | awk '{print $1}' | "$fzf_cmd" --multi)"
@@ -547,8 +609,7 @@ lock() {
     files_to_lock=""
 
     # Only process any input that is a file
-    for file in "$@"
-    do
+    for file in "$@"; do
         if [[ -f "$file" ]]; then
             files_to_lock="${files_to_lock} $file"
         fi
@@ -560,22 +621,22 @@ lock() {
         exit
     fi
 
-    fetchCustomGitLFS
+    uebs::fetch_custom_git_lfs
 
-    eval "$UEBS_GIT_LFS_COMMAND" lock "$files_to_lock"
+    eval "$UEBS_GIT_LFS_COMMAND" uebs::lock "$files_to_lock"
 }
 
-unlock() {
+uebs::unlock() {
     # if [ $# -ne 1 ]; then
     #     echo "Please provide your project root directory as an argument."
     #     exit
     # fi
-    
+
     # Store unprocessed input parameters
     input="$@"
 
     # Try to check if custom LFS exists
-    fetchCustomGitLFS
+    uebs::fetch_custom_git_lfs
 
     # By default append unlock flag
     UEBS_GIT_LFS_COMMAND="${UEBS_GIT_LFS_COMMAND} unlock"
@@ -583,20 +644,20 @@ unlock() {
     # Process possible flags
     while [ $# -gt 0 ]; do
         case $1 in
-            -h | --help)
-                unlockUsage
-                exit 0
-                ;;
-            -a | --all)
-                all="true"
-                ;;
-            -c | --clean*)
-                clean="true"
-                ;;
-            -f | --force*)
-                # Append force flag to our command
-                UEBS_GIT_LFS_COMMAND="${UEBS_GIT_LFS_COMMAND} --force"
-                ;;
+        -h | --help)
+            uebs::unlock_usage
+            exit 0
+            ;;
+        -a | --all)
+            all="true"
+            ;;
+        -c | --clean*)
+            clean="true"
+            ;;
+        -f | --force*)
+            # Append force flag to our command
+            UEBS_GIT_LFS_COMMAND="${UEBS_GIT_LFS_COMMAND} --force"
+            ;;
         esac
         shift
     done
@@ -604,7 +665,7 @@ unlock() {
     # Handle unlocking all but also unlock non-existent files
     if [[ -n "$clean" ]]; then
         echo clean remove
-        unlockAll "$1"
+        uebs::unlock_all "$1"
         exit
     fi
 
@@ -629,7 +690,7 @@ unlock() {
 
     # Handle no input (launch fzf to allow for unlocking)
     if [[ -z "$input" ]]; then
-        fetchFzfCmd
+        uebs::fetch_fzf_command
 
         # Get the users locked files via fzf
         selected_files="$($UEBS_GIT_LFS_COMMAND locks | grep -i $(git config user.name) | awk '{print $1}' | "$fzf_cmd" --multi)"
@@ -644,7 +705,6 @@ unlock() {
         exit
     fi
 
-    
     # Only process any input that is a file
     files_to_unlock=""
 
