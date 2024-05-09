@@ -3,7 +3,7 @@
 
 # This script is your all-in-one solution to verify, build, and run your project.
 
-source "$(pwd)/Library.sh"
+source "$(pwd)/Internal/Library.sh"
 
 checkDependencies
 prepare

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Author: github.com/chillpert
 
-source "$(pwd)/Library.sh"
+source "$(pwd)/Internal/Library.sh"
 
 cleanBuildFiles
 
