@@ -1,4 +1,3 @@
 # Normalize all the files with LF line endings in the repo
 * text=auto
-
 *.sh eol=lf
