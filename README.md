@@ -9,6 +9,7 @@ Simply take a look at `Library.sh` and modify it to match your own needs.
 - cross platform (Windows and Linux)
 - no external dependencies
 - verify installation of Git, Git-LFS, Unreal Engine, VS, DotNet, and other dependencies
+- automatically update your feature branch
 - enforce global project settings on all machines
 - build and launch your C++-based Unreal Engine project
 - automatically push the engine log to a special branch so others can easily take a look at it
