@@ -11,7 +11,7 @@
 #        export UEBS_ENGINE_VERSION="12.7"
 #        export UEBS_DESIRED_VS_VERSION="2077"
 #        export UEBS_DESIRED_DOT_NOT_VERSION=18
-#        export UEBS_GIT_LFS_COMMAND="git lfs"
+#        export UEBS_GIT_LFS_EXECUTABLE="git lfs"
 #        export UEBS_LOG_BRANCH_NAME="our_engine_logs"
 #
 # @NOTE: Linux users must provide the path to their UE5 installation in a variable called 'UE_PATH_LINUX'
@@ -51,8 +51,8 @@ UEBS_LOG_BRANCH_NAME="${UEBS_LOG_BRANCH_NAME:-$default_log_branch_name}"
 
 # @NOTE: Overwrite this variable after sourcing the library script to specify a different git-lfs executable.
 #        For example, I am using the UEGitPlugin's custom git-lfs that can lock and unlock files in parallel.
-default_git_lfs_command="git lfs"
-UEBS_GIT_LFS_COMMAND="${UEBS_GIT_LFS_COMMAND:-$default_git_lfs_command}"
+default_git_lfs_executable="git lfs"
+UEBS_GIT_LFS_EXECUTABLE="${UEBS_GIT_LFS_EXECUTABLE:-$default_git_lfs_executable}"
 
 # @NOTE: You may want to specify
 default_git_hooks_path=".git/hooks"
@@ -117,25 +117,6 @@ uebs::throw_error() {
 
     uebs::wait_for_input
     exit 1
-}
-
-# @TODO: Remove because user should specify it via export
-uebs::fetch_custom_git_lfs() {
-    uebs::get_platform
-
-    if [ -d "Plugins/UEGitPlugin" ]; then
-        if [ "$platform" = "Win64" ]; then
-            if [ -f "Plugins/UEGitPlugin/git-lfs.exe" ]; then
-                UEBS_GIT_LFS_COMMAND="Plugins/UEGitPlugin/git-lfs.exe"
-                uebs::print_success "Found custom LFS executable (Windows)"
-            fi
-        elif [ "$platform" = "Linux" ]; then
-            if [ -f "Plugins/UEGitPlugin/git-lfs" ]; then
-                UEBS_GIT_LFS_COMMAND="Plugins/UEGitPlugin/git-lfs"
-                uebs::print_success "Found custom LFS executable (Linux)"
-            fi
-        fi
-    fi
 }
 
 # @TODO: Add compiler version check?
@@ -500,51 +481,6 @@ uebs::clean_build_files() {
     echo
 }
 
-uebs::unlock_all() {
-    if [ $# -ne 1 ]; then
-        echo "Please provide your project root directory as an argument."
-        exit
-    fi
-
-    read -p "This function will delete all uncommitted local changes. Are you sure that you want to proceed? [yN] (enter y to confirm) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit
-    fi
-
-    cd "$1"
-
-    locks=$(echo "$($UEBS_GIT_LFS_COMMAND locks | grep -i $(git config user.name))" | awk '{print $1}')
-    if [ -z "$locks" ]; then
-        echo "Nothing to do"
-        exit
-    fi
-
-    echo "$locks" | while read line; do
-        mkdir -p $(dirname $line)
-        touch $line
-        git add $line -f
-    done
-
-    uebs::fetch_custom_git_lfs
-
-    git commit -m "Remove locks"
-    $UEBS_GIT_LFS_COMMAND uebs::unlock $(echo $locks)
-    git reset --hard HEAD~1
-
-    uebs::copy_to_clipboard "git lfs lock \"$locks\" | clip"
-
-    cd - 1>/dev/null
-}
-
-uebs::unlock_usage() {
-    echo "Usage: $0 [OPTIONS]"
-    echo "Options:"
-    echo " -a, --all        Removes all of your locks"
-    echo " -c, --clean      Removes all of your locks even if the associated file does not exist on the currently checked out branch (-c implies -a)"
-    echo " -f, --force      Removes all locks by force (for administrators only)"
-}
-
 # In Git bash for windows, pipes and fzf do not work. This is a workaround from https://github.com/junegunn/fzf/issues/2798#issuecomment-1229376159
 uebs::fzf_win_wrapper() {
     set -eo pipefail
@@ -582,144 +518,93 @@ uebs::fetch_fzf_command() {
     fi
 }
 
+# @TODO: Remove because user should specify it via export
+uebs::run_git_lfs_command() {
+    uebs::get_platform
+    
+    git_lfs_executable="$UEBS_GIT_LFS_EXECUTABLE"
+
+    # Only check default paths if no custom lfs executable was specified
+    if [ "$default_git_lfs_executable" == "$UEBS_GIT_LFS_EXECUTABLE" ]; then
+        if [ -d "Plugins/UEGitPlugin" ]; then
+            if [ "$platform" = "Win64" ]; then
+                if [ -f "Plugins/UEGitPlugin/git-lfs.exe" ]; then
+                    uebs::print_success "Found custom LFS executable (Windows)"
+                    git_lfs_executable="Plugins/UEGitPlugin/git-lfs.exe"
+                fi
+            elif [ "$platform" = "Linux" ]; then
+                if [ -f "Plugins/UEGitPlugin/git-lfs" ]; then
+                    uebs::print_success "Found custom LFS executable (Linux)"
+                    git_lfs_executable="Plugins/UEGitPlugin/git-lfs"
+                fi
+            fi
+        fi
+    fi
+    
+    eval "${git_lfs_executable}" "$@"
+}
+
+
 uebs::lock() {
-    # Handle no input (launch fzf to allow for locking)
-    if [[ -z "$input" ]]; then
-        # Try to check if custom LFS exists
-        uebs::fetch_custom_git_lfs
+    uebs::fetch_fzf_command
 
-        # By default append unlock flag
-        UEBS_GIT_LFS_COMMAND="${UEBS_GIT_LFS_COMMAND} lock"
+    # Get all .uassets in content directory
+    selected_files="$(find Content/ -name '*.uasset' | awk '{print $1}' | "$fzf_cmd" --multi)"
+    if [[ -n "$selected_files" ]]; then
+        # Switch end of lines with white spaces
+        selected_files=$(echo "$selected_files" | tr -s '\n' ' ')
 
-        uebs::fetch_fzf_command
-
-        # Get all uassets in Content directory
-        selected_files="$(find Content/ -name '*.uasset' | awk '{print $1}' | "$fzf_cmd" --multi)"
-        if [[ -n "$selected_files" ]]; then
-            # Switch end of lines with white spaces
-            selected_files=$(echo "$selected_files" | tr -s '\n' ' ')
-
-            eval "$UEBS_GIT_LFS_COMMAND" "$selected_files"
-            exit
-        fi
-
-        exit
+        uebs::run_git_lfs_command "lock" "$selected_files" 
+        uebs::copy_to_clipboard "$selected_files"
     fi
-
-    files_to_lock=""
-
-    # Only process any input that is a file
-    for file in "$@"; do
-        if [[ -f "$file" ]]; then
-            files_to_lock="${files_to_lock} $file"
-        fi
-    done
-
-    # Do not need to proceed if no locks exist
-    if [[ -z "$files_to_lock" ]]; then
-        echo "Nothing to do"
-        exit
-    fi
-
-    uebs::fetch_custom_git_lfs
-
-    eval "$UEBS_GIT_LFS_COMMAND" uebs::lock "$files_to_lock"
 }
 
 uebs::unlock() {
-    # if [ $# -ne 1 ]; then
-    #     echo "Please provide your project root directory as an argument."
-    #     exit
-    # fi
+    uebs::fetch_fzf_command
 
-    # Store unprocessed input parameters
-    input="$@"
-
-    # Try to check if custom LFS exists
-    uebs::fetch_custom_git_lfs
-
-    # By default append unlock flag
-    UEBS_GIT_LFS_COMMAND="${UEBS_GIT_LFS_COMMAND} unlock"
-
-    # Process possible flags
-    while [ $# -gt 0 ]; do
-        case $1 in
-        -h | --help)
-            uebs::unlock_usage
-            exit 0
-            ;;
-        -a | --all)
-            all="true"
-            ;;
-        -c | --clean*)
-            clean="true"
-            ;;
-        -f | --force*)
-            # Append force flag to our command
-            UEBS_GIT_LFS_COMMAND="${UEBS_GIT_LFS_COMMAND} --force"
-            ;;
-        esac
-        shift
-    done
-
-    # Handle unlocking all but also unlock non-existent files
-    if [[ -n "$clean" ]]; then
-        echo clean remove
-        uebs::unlock_all "$1"
-        exit
-    fi
-
-    # Handle unlocking all
-    if [[ -n "$all" ]]; then
-        echo "unlocking all ..."
-        locks="$($UEBS_GIT_LFS_COMMAND locks | grep -i $(git config user.name) | awk '{print $1}')"
-
-        # Do not need to proceed if no locks exist
-        if [[ -z "$locks" ]]; then
-            echo "Nothing to do"
-            exit
-        fi
-
+    # Get the users locked files via fzf
+    selected_files="$($UEBS_GIT_LFS_EXECUTABLE locks | grep -i "$(git config user.name)" | awk '{print $1}' | "$fzf_cmd" --multi)"
+    if [[ -n "$selected_files" ]]; then
         # Switch end of lines with white spaces
-        locks=$(echo "$locks" | tr -s '\n' ' ')
+        selected_files=$(echo "$selected_files" | tr -s '\n' ' ')
 
-        # Perform unlocking
-        eval "$UEBS_GIT_LFS_COMMAND" "$locks"
+        uebs::run_git_lfs_command "unlock" "$selected_files" 
+        uebs::copy_to_clipboard "$selected_files"
+    fi
+}
+
+uebs::unlock_all() {
+    if [ $# -ne 1 ]; then
+        echo "Please provide your project root directory as an argument."
         exit
     fi
 
-    # Handle no input (launch fzf to allow for unlocking)
-    if [[ -z "$input" ]]; then
-        uebs::fetch_fzf_command
-
-        # Get the users locked files via fzf
-        selected_files="$($UEBS_GIT_LFS_COMMAND locks | grep -i $(git config user.name) | awk '{print $1}' | "$fzf_cmd" --multi)"
-        if [[ -n "$selected_files" ]]; then
-            # Switch end of lines with white spaces
-            selected_files=$(echo "$selected_files" | tr -s '\n' ' ')
-
-            eval "$UEBS_GIT_LFS_COMMAND" "$selected_files"
-            exit
-        fi
-
+    read -p "This function will delete all uncommitted local changes. Are you sure that you want to proceed? [y/N] (enter y to confirm) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit
     fi
 
-    # Only process any input that is a file
-    files_to_unlock=""
+    cd "$1"
 
-    for file in ${input}; do
-        if [[ -f "$file" ]]; then
-            files_to_unlock="${files_to_unlock} $file"
-        fi
-    done
-
-    # Do not need to proceed if no locks exist
-    if [[ -z "$files_to_unlock" ]]; then
+    locks=$(echo "$($UEBS_GIT_LFS_EXECUTABLE locks | grep -i $(git config user.name))" | awk '{print $1}')
+    if [ -z "$locks" ]; then
         echo "Nothing to do"
         exit
     fi
 
-    # Default: No flags were specified so assume all given inputs are files
-    eval "$UEBS_GIT_LFS_COMMAND" "$files_to_unlock"
+    echo "$locks" | while read line; do
+        mkdir -p "$(dirname "$line")"
+        touch $line
+        git add $line -f
+    done
+
+    git commit -m "Remove locks"
+    uebs::run_git_lfs_command "unlock" "$(echo $locks)"
+    git reset --hard HEAD~1
+
+    uebs::copy_to_clipboard "$locks"
+
+    cd - 1>/dev/null
 }
+
