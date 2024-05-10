@@ -195,7 +195,17 @@ uebs::update() {
         if [[ $(git rev-list --count $current_branch..$UEBS_DEFAULT_PROJECT_BRANCH) -gt 0 ]]; then
             # Ask user if they really want to update their branch
             echo
-            uebs::print_warning "There are updates on $UEBS_DEFAULT_PROJECT_BRANCH. Would you like to update your branch? [y/N] "
+            uebs::print_warning "There are updates on $UEBS_DEFAULT_PROJECT_BRANCH: "
+
+            # Display all changes
+            change_log="$(git log --oneline --pretty=format:"%an: %s" $current_branch..$UEBS_DEFAULT_PROJECT_BRANCH)"
+            if [ -n "$change_log" ]; then
+                echo
+                echo "$change_log"
+                echo
+            fi
+
+            uebs::print_warning "Would you like to update your branch? This will force-push the remote branch, if available. [y/N] "
             read -p "Press 'y' to update, or 'n' to skip." -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -521,7 +531,7 @@ uebs::fetch_fzf_command() {
 # @TODO: Remove because user should specify it via export
 uebs::run_git_lfs_command() {
     uebs::get_platform
-    
+
     git_lfs_executable="$UEBS_GIT_LFS_EXECUTABLE"
 
     # Only check default paths if no custom lfs executable was specified
@@ -540,10 +550,9 @@ uebs::run_git_lfs_command() {
             fi
         fi
     fi
-    
+
     eval "${git_lfs_executable}" "$@"
 }
-
 
 uebs::lock() {
     uebs::fetch_fzf_command
@@ -554,7 +563,7 @@ uebs::lock() {
         # Switch end of lines with white spaces
         selected_files=$(echo "$selected_files" | tr -s '\n' ' ')
 
-        uebs::run_git_lfs_command "lock" "$selected_files" 
+        uebs::run_git_lfs_command "lock" "$selected_files"
         uebs::copy_to_clipboard "$selected_files"
     fi
 }
@@ -568,7 +577,7 @@ uebs::unlock() {
         # Switch end of lines with white spaces
         selected_files=$(echo "$selected_files" | tr -s '\n' ' ')
 
-        uebs::run_git_lfs_command "unlock" "$selected_files" 
+        uebs::run_git_lfs_command "unlock" "$selected_files"
         uebs::copy_to_clipboard "$selected_files"
     fi
 }
@@ -607,4 +616,3 @@ uebs::unlock_all() {
 
     cd - 1>/dev/null
 }
-
