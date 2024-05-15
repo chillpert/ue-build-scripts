@@ -206,14 +206,36 @@ uebs::update() {
             fi
 
             uebs::print_warning "Would you like to update your branch? This will force-push the remote branch, if available. [y/N] "
-            read -p "Press 'y' to update, or 'n' to skip." -n 1 -r
+            read -p "Press 'y' to update, or 'n' to skip. " -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo
                 echo "Updating branch ..."
+                echo
+
+                # If there are any local changes (modified files) we need to stash them first
+                local_changes="$(git status --porcelain --untracked-files=no)"
+                if [ -n "$local_changes" ]; then
+                    has_stashed=1
+                    
+                    git stash
+                    if [ $? -ne 0 ]; then
+                        uebs::throw_error "Failed to stash local changes. Ask tech for help."
+                    fi
+                fi
+
                 git rebase $UEBS_DEFAULT_PROJECT_BRANCH $current_branch
                 if [ $? -ne 0 ]; then
                     git rebase --abort
                     uebs::throw_error "Failed to update local branch. Try updating manually or ask tech for help."
+                fi
+
+                # Re-apply stash
+                if [ "$has_stashed" -eq 1 ]; then
+                    git stash apply
+                    if [ $? -ne 0 ]; then
+                        uebs::throw_error "Failed to apply stash. Ask tech for help before proceeding with work."
+                    fi
                 fi
 
                 uebs::print_success "Successfully updated local branch."
