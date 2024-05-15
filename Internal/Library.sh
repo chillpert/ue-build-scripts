@@ -217,7 +217,7 @@ uebs::update() {
                 local_changes="$(git status --porcelain --untracked-files=no)"
                 if [ -n "$local_changes" ]; then
                     has_stashed=1
-                    
+
                     git stash
                     if [ $? -ne 0 ]; then
                         uebs::throw_error "Failed to stash local changes. Ask tech for help."
@@ -227,6 +227,15 @@ uebs::update() {
                 git rebase $UEBS_DEFAULT_PROJECT_BRANCH $current_branch
                 if [ $? -ne 0 ]; then
                     git rebase --abort
+                    
+                    # If we stashed we need to apply stash again
+                    if [ "$has_stashed" -eq 1 ]; then
+                        git stash apply
+                        if [ $? -ne 0 ]; then
+                            uebs::throw_error "Failed to apply stash after rebase failed. Ask tech for help before proceeding with work."
+                        fi
+                    fi
+                    
                     uebs::throw_error "Failed to update local branch. Try updating manually or ask tech for help."
                 fi
 
