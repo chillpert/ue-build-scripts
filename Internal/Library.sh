@@ -191,6 +191,12 @@ uebs::update() {
             uebs::throw_error "Failed to update project branch '$UEBS_DEFAULT_PROJECT_BRANCH'."
         fi
 
+        # Verify that the default project branch has not diverged from the origin after merging
+        diff_to_origin="$(git diff $UEBS_DEFAULT_PROJECT_BRANCH origin/$UEBS_DEFAULT_PROJECT_BRANCH)"
+        if [ -n "$diff_to_origin" ]; then
+            uebs::throw_error "Failed to update project branch '$UEBS_DEFAULT_PROJECT_BRANCH'. Your local branch has diverged. Please discard or merge your local commits."
+        fi
+
         # Check if project branch is ahead of current branch
         if [[ $(git rev-list --count $current_branch..$UEBS_DEFAULT_PROJECT_BRANCH) -gt 0 ]]; then
             # Ask user if they really want to update their branch
@@ -212,7 +218,7 @@ uebs::update() {
                 echo
                 echo "Updating branch ..."
                 echo
-                
+
                 has_stashed=0
 
                 # If there are any local changes (modified files) we need to stash them first
@@ -229,7 +235,7 @@ uebs::update() {
                 git rebase $UEBS_DEFAULT_PROJECT_BRANCH $current_branch
                 if [ $? -ne 0 ]; then
                     git rebase --abort
-                    
+
                     # If we stashed we need to apply stash again
                     if [ "$has_stashed" -eq 1 ]; then
                         git stash apply
@@ -237,7 +243,7 @@ uebs::update() {
                             uebs::throw_error "Failed to apply stash after rebase failed. Ask tech for help before proceeding with work."
                         fi
                     fi
-                    
+
                     uebs::throw_error "Failed to update local branch. Try updating manually or ask tech for help."
                 fi
 
