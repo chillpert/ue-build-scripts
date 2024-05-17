@@ -212,6 +212,8 @@ uebs::update() {
                 echo
                 echo "Updating branch ..."
                 echo
+                
+                has_stashed=0
 
                 # If there are any local changes (modified files) we need to stash them first
                 local_changes="$(git status --porcelain --untracked-files=no)"
