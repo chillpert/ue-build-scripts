@@ -37,6 +37,9 @@ UEBS_PROJECT_NAME="${UEBS_PROJECT_NAME:-$default_project_name}"
 default_engine_version="5.4"
 UEBS_ENGINE_VERSION="${UEBS_ENGINE_VERSION:-$default_engine_version}"
 
+# If specified, use this engine path instead
+UEBS_ENGINE_PATH_OVERRIDE=""
+
 # @NOTE: Your desired minimum Visual Studio product line version
 default_desired_vs_version="2022"
 UEBS_DESIRED_VS_VERSION="${UEBS_DESIRED_VS_VERSION:-$default_desired_vs_version}"
@@ -336,8 +339,15 @@ uebs::fetch() {
     # Windows
     elif [ "$platform" = "Win64" ]; then
         # Use registry to find install location
-        engine_path="$(powershell -command "(Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\\$UEBS_ENGINE_VERSION' -Name 'InstalledDirectory' ).'InstalledDirectory'")"
-        engine_path="${engine_path//\\//}"
+        
+        if [ -z "$UEBS_ENGINE_PATH_OVERRIDE" ]; then
+          engine_path="$(powershell -command "(Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\\$UEBS_ENGINE_VERSION' -Name 'InstalledDirectory' ).'InstalledDirectory'")"
+          engine_path="${engine_path//\\//}"
+        else
+          engine_path="$UEBS_ENGINE_PATH_OVERRIDE" 
+          engine_path="${engine_path//\\//}"
+        fi
+        
     else
         uebs::throw_error "This platform is not supported."
     fi
@@ -419,6 +429,25 @@ uebs::run() {
     if [ $? -ne 0 ]; then
         uebs::throw_error "Failed to launch UnrealEditor."
     fi
+}
+
+uebs::package() {
+  uebs::print_header "Packaging $UEBS_PROJECT_NAME ..."
+  
+  uebs::get_platform
+  uebs::fetch
+  
+  current_date="$(date +"%Y-%m-%d@%H-%M-%S")"
+  
+  if [ "$platform" = "Win64" ]; then
+      platform="Win64"
+  elif [ "$platform" = "Linux" ]; then
+      platform="Linux"
+  else
+      uebs::throw_error "This platform is not supported."
+  fi
+  
+  "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -platform=$platform -configuration=Shipping -nocompileeditor -unattended -utf8output -clean -build -cook -stage -pak -prereqs -package -archive -archivedirectory="$UEBS_PROJECT_PATH/Builds/$current_date/"
 }
 
 uebs::upload_engine_logs() {
