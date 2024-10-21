@@ -285,12 +285,23 @@ uebs::prepare() {
     uebs::print_header "Preparing repository ..."
 
     cd "$UEBS_PROJECT_PATH"
-
-    # Initialize LFS
-    git lfs install --force
+    
+    # Load custom git hooks
+    git config core.hooksPath "$UEBS_GIT_HOOKS_PATH"
     if [ $? -ne 0 ]; then
-        uebs::throw_error "Failed to initialize Git LFS. Please ask tech for help."
+        uebs::throw_error "Failed to set git hooks path. Please try updating your git installation."
     fi
+    
+    # @note Only install LFS if no custom Git hooks path is specified.
+    # We assume that if it was specified, the user has custom Git hooks that they don't wish to be overwritten
+    if [[ "$UEBS_GIT_HOOKS_PATH" == "$default_git_hooks_path" ]]; then
+      # Initialize LFS
+      git lfs install --force
+      if [ $? -ne 0 ]; then
+          uebs::throw_error "Failed to initialize Git LFS. Please ask tech for help."
+      fi
+    fi
+    
 
     # Set rebase policy
     git config pull.rebase true
@@ -299,15 +310,10 @@ uebs::prepare() {
     # @NOTE: Please use .gitattributes in your repo instead
     git config core.autocrlf true
 
-    # Load custom git hooks
-    git config core.hooksPath "$UEBS_GIT_HOOKS_PATH"
-    if [ $? -ne 0 ]; then
-        uebs::throw_error "Failed to set git hooks path. Please try updating your git installation."
-    fi
-
     # Make sure hooks are available
-    # @TODO: This overwrites any custom hooks
-    git lfs update --force
+    if [[ "$UEBS_GIT_HOOKS_PATH" == "$default_git_hooks_path" ]]; then
+      git lfs update --force
+    fi
 
     # Load Git aliases
     git config include.path "../.gitalias"
