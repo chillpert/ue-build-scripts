@@ -13,6 +13,7 @@
 #        export UEBS_DESIRED_DOT_NOT_VERSION=18
 #        export UEBS_GIT_LFS_EXECUTABLE="git lfs"
 #        export UEBS_LOG_BRANCH_NAME="our_engine_logs"
+#        export UEBS_PACKAGE_ARGS="-configuration=Shipping -nocompileeditor -unattended -utf8output -build -cook"
 #
 # @NOTE: Linux users must provide the path to their UE5 installation in a variable called 'UE_PATH_LINUX'
 #        Add 'export UE_PATH_LINUX="/my/path/to/UE"' to your '.bashrc' or '.zshrc'.
@@ -65,6 +66,11 @@ UEBS_GIT_HOOKS_PATH="${UEBS_GIT_HOOKS_PATH:-$default_git_hooks_path}"
 #        auto-update step.
 default_project_branch="main"
 UEBS_DEFAULT_PROJECT_BRANCH="${UEBS_DEFAULT_PROJECT_BRANCH:-$default_project_branch}"
+
+# @NOTE: The default arguments to use for packaging. There are additional arguments that cannot be skipped, check
+# uebs::package for reference. No -clean by default is used.
+default_package_args="-configuration=Shipping -nocompileeditor -unattended -utf8output -build -cook -stage -pak -prereqs"
+UEBS_PACKAGE_ARGS="${UEBS_PACKAGE_ARGS:-$default_package_args}"
 
 ######################################################################################################
 ###################################### Implementations ###############################################
@@ -285,23 +291,22 @@ uebs::prepare() {
     uebs::print_header "Preparing repository ..."
 
     cd "$UEBS_PROJECT_PATH"
-    
+
     # Load custom git hooks
     git config core.hooksPath "$UEBS_GIT_HOOKS_PATH"
     if [ $? -ne 0 ]; then
         uebs::throw_error "Failed to set git hooks path. Please try updating your git installation."
     fi
-    
+
     # @note Only install LFS if no custom Git hooks path is specified.
     # We assume that if it was specified, the user has custom Git hooks that they don't wish to be overwritten
     if [[ "$UEBS_GIT_HOOKS_PATH" == "$default_git_hooks_path" ]]; then
-      # Initialize LFS
-      git lfs install --force
-      if [ $? -ne 0 ]; then
-          uebs::throw_error "Failed to initialize Git LFS. Please ask tech for help."
-      fi
+        # Initialize LFS
+        git lfs install --force
+        if [ $? -ne 0 ]; then
+            uebs::throw_error "Failed to initialize Git LFS. Please ask tech for help."
+        fi
     fi
-    
 
     # Set rebase policy
     git config pull.rebase true
@@ -312,7 +317,7 @@ uebs::prepare() {
 
     # Make sure hooks are available
     if [[ "$UEBS_GIT_HOOKS_PATH" == "$default_git_hooks_path" ]]; then
-      git lfs update --force
+        git lfs update --force
     fi
 
     # Load Git aliases
@@ -345,15 +350,15 @@ uebs::fetch() {
     # Windows
     elif [ "$platform" = "Win64" ]; then
         # Use registry to find install location
-        
+
         if [ -z "$UEBS_ENGINE_PATH_OVERRIDE" ]; then
-          engine_path="$(powershell -command "(Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\\$UEBS_ENGINE_VERSION' -Name 'InstalledDirectory' ).'InstalledDirectory'")"
-          engine_path="${engine_path//\\//}"
+            engine_path="$(powershell -command "(Get-ItemProperty 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EpicGames\Unreal Engine\\$UEBS_ENGINE_VERSION' -Name 'InstalledDirectory' ).'InstalledDirectory'")"
+            engine_path="${engine_path//\\//}"
         else
-          engine_path="$UEBS_ENGINE_PATH_OVERRIDE" 
-          engine_path="${engine_path//\\//}"
+            engine_path="$UEBS_ENGINE_PATH_OVERRIDE"
+            engine_path="${engine_path//\\//}"
         fi
-        
+
     else
         uebs::throw_error "This platform is not supported."
     fi
@@ -437,23 +442,73 @@ uebs::run() {
     fi
 }
 
+# You may pass additional package args as arguments to this function but prefer setting UEBS_PACKAGE_ARGS instead
 uebs::package() {
-  uebs::print_header "Packaging $UEBS_PROJECT_NAME ..."
-  
-  uebs::get_platform
-  uebs::fetch
-  
-  current_date="$(date +"%Y-%m-%d@%H-%M-%S")"
-  
-  if [ "$platform" = "Win64" ]; then
-      platform="Win64"
-  elif [ "$platform" = "Linux" ]; then
-      platform="Linux"
-  else
-      uebs::throw_error "This platform is not supported."
-  fi
-  
-  "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -platform=$platform -configuration=Shipping -nocompileeditor -unattended -utf8output -clean -build -cook -stage -pak -prereqs -package -archive -archivedirectory="$UEBS_PROJECT_PATH/Builds/$current_date/"
+    uebs::print_header "Packaging $UEBS_PROJECT_NAME ..."
+
+    uebs::get_platform
+    uebs::fetch
+
+    current_date="$(date +"%d.%m.%y-%H.%M.%S")"
+    output_path="${UEBS_PROJECT_PATH}/Builds"
+    output_directory_name="${UEBS_PROJECT_NAME}-${platform}-${current_date}"
+
+    # If the build includes debug files, change the directory name to reflect it
+    default_game_config="$UEBS_PROJECT_PATH/Config/DefaultGame.ini"
+    if [ -e "$default_game_config" ]; then
+        if grep -qE 'IncludeDebugFiles\s*=\s*True' "$default_game_config"; then
+            uebs::print_error "⛔ This build contains debug files and must NOT be distributed. Use for internal testing only."
+            echo
+
+            sleep 2
+            output_directory_name="InternalOnly-${output_directory_name}"
+        fi
+    fi
+    
+    # Start packaging
+    output_dir="${output_path}/${output_directory_name}"
+    "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -platform=$platform $UEBS_PACKAGE_ARGS -package -archive -archivedirectory="$output_dir" "$@"
+    if [ $? -ne 0 ]; then
+        uebs::print_error "Packaging failed."
+        exit 1
+    else
+        echo "Packaging completed. You may start testing now."
+        
+        # Create a build description
+        commit_hash="$(git --git-dir="${UEBS_PROJECT_PATH}/.git" --work-tree="$UEBS_PROJECT_PATH" rev-parse --short HEAD)"
+        {
+            echo "# ${UEBS_PROJECT_NAME}"
+            echo "## Build Specifications"
+            echo ""
+            echo "Date: $current_date"
+            echo "Commit: $commit_hash"
+            echo "Platform: $platform"
+        } > "$output_dir/Windows/README.md"
+        
+        mv "$output_dir/Windows" "$output_dir/${output_directory_name}/"
+    fi
+
+    # Create compressed archive of the output
+    if [ -d "$output_dir" ]; then
+        echo
+        uebs::print_header "Creating compressed archive ..."
+        
+        if [ "$platform" = "Win64" ]; then
+            output_dir_win="$(cygpath -w "$output_dir")"
+            powershell Compress-Archive "$output_dir_win\\${output_directory_name}" "${output_dir_win}\\${output_directory_name}.zip"
+            echo "Compression finished"
+            echo "You will find the archive in \"$output_dir_win/\"."
+            
+            explorer "$output_dir_win"
+            
+        elif [ "$platform" = "Linux" ]; then
+            uebs::print_error "Compression of packaging output not yet implemented on Linux."
+        fi
+        
+    fi
+    
+    echo
+    uebs::print_success "Packaging finished."
 }
 
 uebs::upload_engine_logs() {
