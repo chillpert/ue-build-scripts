@@ -449,9 +449,9 @@ uebs::package() {
     uebs::get_platform
     uebs::fetch
 
-    current_date="$(date +"%d.%m.%y-%H.%M.%S")"
+    current_date="$(date +"%y.%m.%d-%H.%M")"
     output_path="${UEBS_PROJECT_PATH}/Builds"
-    output_directory_name="${UEBS_PROJECT_NAME}-${platform}-${current_date}"
+    output_directory_name="${UEBS_PROJECT_NAME}-${current_date}-${platform}"
 
     # If the build includes debug files, change the directory name to reflect it
     default_game_config="$UEBS_PROJECT_PATH/Config/DefaultGame.ini"
@@ -461,7 +461,7 @@ uebs::package() {
             echo
 
             sleep 2
-            output_directory_name="InternalOnly-${output_directory_name}"
+            output_directory_name="${output_directory_name}-InternalOnly"
         fi
     fi
     
@@ -480,9 +480,9 @@ uebs::package() {
             echo "# ${UEBS_PROJECT_NAME}"
             echo "## Build Specifications"
             echo ""
-            echo "Date: $current_date"
-            echo "Commit: $commit_hash"
-            echo "Platform: $platform"
+            echo "Date: $current_date<br>"
+            echo "Commit: $commit_hash<br>"
+            echo "Platform: $platform<br>"
         } > "$output_dir/Windows/README.md"
         
         mv "$output_dir/Windows" "$output_dir/${output_directory_name}/"
