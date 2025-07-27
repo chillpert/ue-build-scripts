@@ -453,18 +453,6 @@ uebs::package() {
     output_path="${UEBS_PROJECT_PATH}/Builds"
     output_directory_name="${UEBS_PROJECT_NAME}-${current_date}-${platform}"
 
-    # If the build includes debug files, change the directory name to reflect it
-    default_game_config="$UEBS_PROJECT_PATH/Config/DefaultGame.ini"
-    if [ -e "$default_game_config" ]; then
-        if grep -qE 'IncludeDebugFiles\s*=\s*True' "$default_game_config"; then
-            uebs::print_error "⛔ This build contains debug files and must NOT be distributed. Use for internal testing only."
-            echo
-
-            sleep 2
-            output_directory_name="${output_directory_name}-InternalOnly"
-        fi
-    fi
-    
     # Start packaging
     output_dir="${output_path}/${output_directory_name}"
     "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -platform=$platform $UEBS_PACKAGE_ARGS -package -archive -archivedirectory="$output_dir" "$@"
