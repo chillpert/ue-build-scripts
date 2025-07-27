@@ -461,7 +461,7 @@ uebs::package() {
     # Start packaging
     output_dir="${output_path}/${output_directory_name}"
     
-    "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -platform=$platform -prereqs -cook -build -stage -pak -iostore -configuration=Shipping -nop4 -utf8output -package -archive -archivedirectory="$output_dir" $build_flags
+    "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -platform=$platform -installed -prereqs -cook -build -stage -pak -iostore -compressed -configuration=Shipping -nop4 -utf8output -package -archive -archivedirectory="$output_dir" $build_flags
     
     if [ $? -ne 0 ]; then
         uebs::print_error "Packaging failed."
