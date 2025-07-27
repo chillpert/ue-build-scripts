@@ -13,7 +13,6 @@
 #        export UEBS_DESIRED_DOT_NOT_VERSION=18
 #        export UEBS_GIT_LFS_EXECUTABLE="git lfs"
 #        export UEBS_LOG_BRANCH_NAME="our_engine_logs"
-#        export UEBS_PACKAGE_ARGS="-configuration=Shipping -nocompileeditor -unattended -utf8output -build -cook"
 #
 # @NOTE: Linux users must provide the path to their UE5 installation in a variable called 'UE_PATH_LINUX'
 #        Add 'export UE_PATH_LINUX="/my/path/to/UE"' to your '.bashrc' or '.zshrc'.
@@ -66,11 +65,6 @@ UEBS_GIT_HOOKS_PATH="${UEBS_GIT_HOOKS_PATH:-$default_git_hooks_path}"
 #        auto-update step.
 default_project_branch="main"
 UEBS_DEFAULT_PROJECT_BRANCH="${UEBS_DEFAULT_PROJECT_BRANCH:-$default_project_branch}"
-
-# @NOTE: The default arguments to use for packaging. There are additional arguments that cannot be skipped, check
-# uebs::package for reference. No -clean by default is used.
-default_package_args="-configuration=Shipping -nocompileeditor -unattended -utf8output -build -cook -stage -pak -prereqs"
-UEBS_PACKAGE_ARGS="${UEBS_PACKAGE_ARGS:-$default_package_args}"
 
 ######################################################################################################
 ###################################### Implementations ###############################################
@@ -443,19 +437,32 @@ uebs::run() {
 }
 
 # You may pass additional package args as arguments to this function but prefer setting UEBS_PACKAGE_ARGS instead
+# Param1: true if build is for distribution
 uebs::package() {
     uebs::print_header "Packaging $UEBS_PROJECT_NAME ..."
 
     uebs::get_platform
     uebs::fetch
+    
+    local is_distributable=$1
+    local build_flags=""
 
     current_date="$(date +"%y.%m.%d-%H.%M")"
     output_path="${UEBS_PROJECT_PATH}/Builds"
     output_directory_name="${UEBS_PROJECT_NAME}-${current_date}-${platform}"
+    
+    if [ "$is_distributable" = true ]; then
+        build_flags+="-clean -nodebuginfo -distribution"
+    else
+        output_directory_name="InternalOnly-${output_directory_name}"
+        build_flags+="-CrashReporter -separatedebuginfo"
+    fi
 
     # Start packaging
     output_dir="${output_path}/${output_directory_name}"
-    "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -platform=$platform $UEBS_PACKAGE_ARGS -package -archive -archivedirectory="$output_dir" "$@"
+    
+    "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -platform=$platform -prereqs -cook -build -stage -pak -iostore -configuration=Shipping -nop4 -utf8output -package -archive -archivedirectory="$output_dir" $build_flags
+    
     if [ $? -ne 0 ]; then
         uebs::print_error "Packaging failed."
         exit 1
