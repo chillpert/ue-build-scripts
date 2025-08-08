@@ -452,17 +452,16 @@ uebs::package() {
     output_directory_name="${UEBS_PROJECT_NAME}-${current_date}-${platform}"
     
     if [ "$is_distributable" = true ]; then
-        build_flags+="-clean -nodebuginfo -distribution"
+        build_flags+="-nodebuginfo -distribution"
     else
         output_directory_name="InternalOnly-${output_directory_name}"
-        build_flags+="-CrashReporter -separatedebuginfo"
     fi
 
     # Start packaging
     output_dir="${output_path}/${output_directory_name}"
     
-    "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -platform=$platform -installed -prereqs -cook -build -stage -pak -iostore -compressed -configuration=Shipping -nop4 -utf8output -package -archive -archivedirectory="$output_dir" $build_flags
-    
+    "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -nop4 -utf8output -nocompileeditor -skipbuildeditor -cook -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -target=Marmortal -platform=$platform -installed -stage -archive -package -build -pak -iostore -compressed -prereqs -archivedirectory="$output_dir" -CrashReporter -clientconfig=Shipping $build_flags
+     
     if [ $? -ne 0 ]; then
         uebs::print_error "Packaging failed."
         exit 1
