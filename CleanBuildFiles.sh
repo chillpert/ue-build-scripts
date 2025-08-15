@@ -5,4 +5,4 @@ source "$(pwd)/Internal/Library.sh"
 
 uebs::clean_build_files
 
-waitForInput
+uebs::wait_for_input
