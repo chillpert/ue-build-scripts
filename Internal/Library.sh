@@ -16,7 +16,6 @@
 #
 # @NOTE: Linux users must provide the path to their UE5 installation in a variable called 'UE_PATH_LINUX'
 #        Add 'export UE_PATH_LINUX="/my/path/to/UE"' to your '.bashrc' or '.zshrc'.
-######################################################################################################
 
 # @NOTE: Change this to match your game's root directory.
 #        In this case, the script repository is located directly inside
@@ -38,7 +37,8 @@ default_engine_version="5.4"
 UEBS_ENGINE_VERSION="${UEBS_ENGINE_VERSION:-$default_engine_version}"
 
 # If specified, use this engine path instead
-UEBS_ENGINE_PATH_OVERRIDE=""
+default_engine_path_override=""
+UEBS_ENGINE_PATH_OVERRIDE="${UEBS_ENGINE_PATH_OVERRIDE:-$default_engine_path_override}"
 
 # @NOTE: Your desired minimum Visual Studio product line version
 default_desired_vs_version="2022"
