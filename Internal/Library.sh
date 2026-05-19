@@ -66,6 +66,11 @@ UEBS_GIT_HOOKS_PATH="${UEBS_GIT_HOOKS_PATH:-$default_git_hooks_path}"
 default_project_branch="main"
 UEBS_DEFAULT_PROJECT_BRANCH="${UEBS_DEFAULT_PROJECT_BRANCH:-$default_project_branch}"
 
+# @NOTE: Set this to your full Wwise version string (e.g. "2025.1.6.9117") to enable automatic soundbank
+#        generation before packaging. Soundbank generation is Windows-only and silently skipped otherwise.
+default_wwise_version=""
+UEBS_WWISE_VERSION="${UEBS_WWISE_VERSION:-$default_wwise_version}"
+
 ######################################################################################################
 ###################################### Implementations ###############################################
 ######################################################################################################
@@ -703,6 +708,50 @@ uebs::unlock() {
         uebs::run_git_lfs_command "unlock" "$selected_files"
         uebs::copy_to_clipboard "$selected_files"
     fi
+}
+
+uebs::generate_wwise_soundbanks() {
+    uebs::get_platform
+
+    if [ "$platform" != "Win64" ]; then
+        return 0
+    fi
+
+    uebs::print_header "Generating Wwise soundbanks ..."
+
+    if [ -z "$UEBS_WWISE_VERSION" ]; then
+        uebs::print_warning "UEBS_WWISE_VERSION is not set. Skipping soundbank generation."
+        echo
+        return 0
+    fi
+
+    local wwise_console="/c/Audiokinetic/Wwise${UEBS_WWISE_VERSION}/Authoring/x64/Release/bin/WwiseConsole.exe"
+
+    if [ ! -f "$wwise_console" ]; then
+        uebs::print_warning "WwiseConsole.exe not found at: $wwise_console"
+        uebs::print_warning "Skipping soundbank generation and continuing with packaging ..."
+        echo
+        return 0
+    fi
+
+    local wproj_path="${UEBS_PROJECT_PATH}/Marmortal_WwiseProject/Marmortal_WwiseProject.wproj"
+
+    if [ ! -f "$wproj_path" ]; then
+        uebs::print_warning "Wwise project file not found at: $wproj_path"
+        uebs::print_warning "Skipping soundbank generation and continuing with packaging ..."
+        echo
+        return 0
+    fi
+
+    "$wwise_console" generate-soundbank "$wproj_path" --platform Windows
+
+    if [ $? -ne 0 ]; then
+        uebs::print_warning "Soundbank generation failed. Continuing with packaging ..."
+    else
+        uebs::print_success "Soundbank generation completed."
+    fi
+
+    echo
 }
 
 uebs::unlock_all() {
