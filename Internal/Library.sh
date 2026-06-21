@@ -71,6 +71,33 @@ UEBS_DEFAULT_PROJECT_BRANCH="${UEBS_DEFAULT_PROJECT_BRANCH:-$default_project_bra
 default_wwise_version=""
 UEBS_WWISE_VERSION="${UEBS_WWISE_VERSION:-$default_wwise_version}"
 
+# @NOTE: The directory to put the rclone executable
+default_tools_dir="$(dirname "$0")/.tools"
+UEBS_TOOLS_DIR="${UEBS_TOOLS_DIR:-$default_tools_dir}"
+
+# @NOTE: The default rclone version to use to get dependencies from common cloud storage providers
+default_rclone_version="v1.68.2"
+UEBS_RCLONE_VERSION="${UEBS_RCLONE_VERSION:-$default_rclone_version}"
+
+# @NOTE: Define external dependencies as newline-separated entries:
+#        "remote_name|remote_type|remote_source_path|local_dest_path"
+#        Each unique remote is configured on first use (may open a browser for auth).
+#        Set this in your Launch.sh. Single entry example:
+#        export UEBS_EXTERNAL_DEPENDENCIES="wwise-plugin|drive|SomeFolder/ThirdParty/Wwise-2025.1.6.9117.zip|Plugins"
+#        The above line would download the Wwise.zip from your Google drive and extract it to your project's `Plugins` folder.
+#        Multiple entries (use $'...' for literal newlines):
+#        export UEBS_EXTERNAL_DEPENDENCIES=$'remote-a|drive|SourceA|DestA\nremote-b|s3|SourceB|DestB'
+#
+#        If an external dependency was set up, a `.dep_versions` file will be created in the project root directory if the
+#        dependency was downloaded and extracted successfully. The dependency won't be downloaded again, unless the name of
+#        the zip to download has changed.
+#        For example in the case of Wwise, I'd store it on your drive with the version encoded like `Wwise-2025.1.6.9117.zip`.
+#        This would also allow other devs to check out an older version of the repo (assuming the older dependency wasn't deleted).
+#        However, keep in mind that if you previously had the dependency tracked by Git, there will be a conflict trying to switch
+#        to the older commit. You would have to delete the downloaded dependencies manually before.
+default_external_dependencies=""
+UEBS_EXTERNAL_DEPENDENCIES="${UEBS_EXTERNAL_DEPENDENCIES:-$default_external_dependencies}"
+
 ######################################################################################################
 ###################################### Implementations ###############################################
 ######################################################################################################
@@ -448,14 +475,14 @@ uebs::package() {
 
     uebs::get_platform
     uebs::fetch
-    
+
     local is_distributable=$1
     local build_flags=""
 
     current_date="$(date +"%y.%m.%d-%H.%M")"
     output_path="${UEBS_PROJECT_PATH}/Builds"
     output_directory_name="${UEBS_PROJECT_NAME}-${current_date}-${platform}"
-    
+
     if [ "$is_distributable" = true ]; then
         build_flags+="-nodebuginfo -distribution"
     else
@@ -464,15 +491,15 @@ uebs::package() {
 
     # Start packaging
     output_dir="${output_path}/${output_directory_name}"
-    
-    "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -nop4 -utf8output -nocompileeditor -skipbuildeditor -cook -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -target=Marmortal -platform=$platform -installed -stage -archive -package -build -pak -iostore -compressed -prereqs -archivedirectory="$output_dir" -CrashReporter -clientconfig=Shipping $build_flags
-     
+
+    "${engine_path}/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun -nop4 -utf8output -nocompileeditor -skipbuildeditor -cook -project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -target=${UEBS_PROJECT_NAME} -platform=$platform -installed -stage -archive -package -build -pak -iostore -compressed -prereqs -archivedirectory="$output_dir" -CrashReporter -clientconfig=Shipping $build_flags
+
     if [ $? -ne 0 ]; then
         uebs::print_error "Packaging failed."
         exit 1
     else
         echo "Packaging completed. You may start testing now."
-        
+
         # Create a build description
         commit_hash="$(git --git-dir="${UEBS_PROJECT_PATH}/.git" --work-tree="$UEBS_PROJECT_PATH" rev-parse --short HEAD)"
         {
@@ -483,7 +510,7 @@ uebs::package() {
             echo "Commit: $commit_hash<br>"
             echo "Platform: $platform<br>"
         } > "$output_dir/Windows/README.md"
-        
+
         mv "$output_dir/Windows" "$output_dir/${output_directory_name}/"
     fi
 
@@ -491,21 +518,21 @@ uebs::package() {
     if [ -d "$output_dir" ]; then
         echo
         uebs::print_header "Creating compressed archive ..."
-        
+
         if [ "$platform" = "Win64" ]; then
             output_dir_win="$(cygpath -w "$output_dir")"
             powershell Compress-Archive "$output_dir_win\\${output_directory_name}" "${output_dir_win}\\${output_directory_name}.zip"
             echo "Compression finished"
             echo "You will find the archive in \"$output_dir_win/\"."
-            
+
             explorer "$output_dir_win"
-            
+
         elif [ "$platform" = "Linux" ]; then
             uebs::print_error "Compression of packaging output not yet implemented on Linux."
         fi
-        
+
     fi
-    
+
     echo
     uebs::print_success "Packaging finished."
 }
@@ -565,7 +592,7 @@ uebs::upload_engine_logs() {
     git push
 
     # Keep track of that commit
-    log_commit_info="$(git log -1 --oneline) 
+    log_commit_info="$(git log -1 --oneline)
 $(git config --get remote.origin.url | sed -e 's/\.git$//g')/commit/$(git rev-parse HEAD)"
 
     # Go back to the previous directory
@@ -734,7 +761,7 @@ uebs::generate_wwise_soundbanks() {
         return 0
     fi
 
-    local wproj_path="${UEBS_PROJECT_PATH}/Marmortal_WwiseProject/Marmortal_WwiseProject.wproj"
+    local wproj_path="${UEBS_PROJECT_PATH}/${UEBS_PROJECT_NAME}_WwiseProject/${UEBS_PROJECT_NAME}_WwiseProject.wproj"
 
     if [ ! -f "$wproj_path" ]; then
         uebs::print_warning "Wwise project file not found at: $wproj_path"
@@ -787,4 +814,118 @@ uebs::unlock_all() {
     uebs::copy_to_clipboard "$locks"
 
     cd - 1>/dev/null
+}
+
+uebs::download_dependencies() {
+    if [ -z "$UEBS_EXTERNAL_DEPENDENCIES" ]; then
+        echo "No external dependencies defined. Skipping."
+        return 0
+    fi
+
+    uebs::print_header "Downloading external dependencies ..."
+
+    uebs::get_platform
+
+    case "$platform" in
+        Linux)
+            case "$(uname -m)" in
+                x86_64)  OS="linux-amd64" ;;
+                aarch64) OS="linux-arm64" ;;
+                *) uebs::throw_error "Unsupported architecture for dependency download." ;;
+            esac
+            ;;
+        Win64) OS="windows-amd64" ;;
+    esac
+
+    local rclone_bin="$UEBS_TOOLS_DIR/rclone"
+    [[ "$OS" == windows* ]] && rclone_bin="${rclone_bin}.exe"
+
+    if ! command -v unzip &>/dev/null; then
+        uebs::throw_error "Please install 'unzip' and try again."
+    fi
+
+    if [[ ! -f "$rclone_bin" ]]; then
+        echo "Downloading rclone ${UEBS_RCLONE_VERSION} ..."
+        mkdir -p "$UEBS_TOOLS_DIR"
+        local rclone_zip="rclone-${UEBS_RCLONE_VERSION}-${OS}.zip"
+        curl -fsSL "https://downloads.rclone.org/${UEBS_RCLONE_VERSION}/${rclone_zip}" -o "$UEBS_TOOLS_DIR/$rclone_zip"
+        unzip -jo "$UEBS_TOOLS_DIR/$rclone_zip" "*/rclone*" -d "$UEBS_TOOLS_DIR"
+        rm "$UEBS_TOOLS_DIR/$rclone_zip"
+        chmod +x "$rclone_bin"
+
+        if [[ ! -f "$rclone_bin" ]]; then
+            uebs::throw_error "Failed to download rclone. Please install it manually from https://rclone.org/downloads/ and try again."
+        fi
+    fi
+
+    while IFS= read -r entry; do
+        [[ -z "$entry" ]] && continue
+
+        IFS='|' read -r remote_name remote_type remote_src local_dst <<< "$entry"
+
+        if [ -z "$remote_name" ] || [ -z "$remote_type" ] || [ -z "$remote_src" ] || [ -z "$local_dst" ]; then
+            uebs::print_warning "Skipping malformed dependency entry: '$entry'"
+            continue
+        fi
+
+        local abs_dst="${UEBS_PROJECT_PATH}/${local_dst}"
+        local versions_file="${UEBS_PROJECT_PATH}/.dep_versions"
+        local stored
+        stored="$(grep "^${remote_name}=" "$versions_file" 2>/dev/null | cut -d'=' -f2-)"
+
+        if [ "$stored" = "$remote_src" ]; then
+            echo "'${remote_name}' is already up to date. Skipping."
+            continue
+        fi
+
+        if ! "$rclone_bin" listremotes | grep -q "^${remote_name}:"; then
+            echo "Configuring remote '$remote_name' (type: $remote_type) ..."
+            "$rclone_bin" config create "$remote_name" "$remote_type" scope drive.readonly
+            if [ $? -ne 0 ]; then
+                uebs::throw_error "Failed to configure rclone remote '$remote_name'."
+            fi
+        fi
+
+        local tmp_zip
+        tmp_zip="$(mktemp --suffix=.zip)"
+
+        echo "Downloading '${remote_name}:${remote_src}' ..."
+        "$rclone_bin" copyto "${remote_name}:${remote_src}" "$tmp_zip" --progress
+        if [ $? -ne 0 ] && [ "$remote_type" == "drive" ]; then
+            echo "Retrying with --drive-shared-with-me ..."
+            "$rclone_bin" copyto "${remote_name}:${remote_src}" "$tmp_zip" --progress --drive-shared-with-me
+        fi
+        if [ $? -ne 0 ]; then
+            rm -f "$tmp_zip"
+            uebs::throw_error "Failed to download '${remote_name}:${remote_src}'."
+        fi
+
+        local tmp_extract
+        tmp_extract="$(mktemp -d)"
+
+        echo "Extracting to '${abs_dst}' ..."
+        unzip -o "$tmp_zip" -d "$tmp_extract"
+        if [ $? -ne 0 ]; then
+            rm -f "$tmp_zip"
+            rm -rf "$tmp_extract"
+            uebs::throw_error "Failed to extract '${remote_name}:${remote_src}'."
+        fi
+
+        mkdir -p "$abs_dst"
+        for item in "$tmp_extract"/*; do
+            local item_name
+            item_name="$(basename "$item")"
+            rm -rf "${abs_dst}/${item_name}"
+            mv "$item" "${abs_dst}/${item_name}"
+        done
+
+        rm -f "$tmp_zip"
+        rm -rf "$tmp_extract"
+        sed -i "/^${remote_name}=/d" "$versions_file" 2>/dev/null
+        echo "${remote_name}=${remote_src}" >> "$versions_file"
+
+    done <<< "$UEBS_EXTERNAL_DEPENDENCIES"
+
+    uebs::print_success "All external dependencies downloaded."
+    echo
 }
