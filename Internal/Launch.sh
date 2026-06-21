@@ -6,6 +6,7 @@
 source "$(pwd)/Internal/Library.sh"
 
 # Execute all core-functions
+uebs::download_dependencies
 uebs::check_dependencies
 uebs::prepare
 uebs::update
