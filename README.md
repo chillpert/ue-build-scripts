@@ -9,14 +9,15 @@ Take a look at `Library.sh` for more explanations and modify it as you need.
 ### Features
 
 - cross-platform (Windows and Linux)
-- no external dependencies
 - verify installation of Git, Git-LFS, Unreal Engine, VS, DotNet, and other dependencies
 - automatically update your feature branch
 - enforce global project settings on all machines
 - build and launch your C++-based Unreal Engine project
 - automatically push the engine log to a special branch so others can easily take a look at it
+- download and deploy dependencies from any cloud storage (using rclone)
 - generate automated bug reports that automatically link the relevant commit and engine log
 - LFS locking tooling (with built-in fzf)
+- no external dependencies required
 - **Designed for rebase-only policy**
 
 ### Requirements
