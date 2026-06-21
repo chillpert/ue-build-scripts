@@ -72,7 +72,7 @@ default_wwise_version=""
 UEBS_WWISE_VERSION="${UEBS_WWISE_VERSION:-$default_wwise_version}"
 
 # @NOTE: The directory to put the rclone executable
-default_tools_dir="$(dirname "$0")/.tools"
+default_tools_dir="${UEBS_PROJECT_PATH}/.tools"
 UEBS_TOOLS_DIR="${UEBS_TOOLS_DIR:-$default_tools_dir}"
 
 # @NOTE: The default rclone version to use to get dependencies from common cloud storage providers
