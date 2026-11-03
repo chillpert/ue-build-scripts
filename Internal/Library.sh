@@ -521,7 +521,24 @@ uebs::package() {
 
         if [ "$platform" = "Win64" ]; then
             output_dir_win="$(cygpath -w "$output_dir")"
-            powershell Compress-Archive "$output_dir_win\\${output_directory_name}" "${output_dir_win}\\${output_directory_name}.zip"
+            archive_name="${output_directory_name}.zip"
+            seven_zip="$(cygpath -u "$PROGRAMFILES")/7-Zip/7z.exe"
+            rm -f "$output_dir/$archive_name"
+
+            # Compress-Archive in Windows PowerShell 5.1 fails on files over 2 GB, so use 7-Zip if installed and
+            # otherwise the bsdtar that ships with Windows 10 and later
+            if [ -f "$seven_zip" ]; then
+                (cd "$output_dir" && "$seven_zip" a -tzip -bso0 -bsp1 "$archive_name" "$output_directory_name")
+            else
+                (cd "$output_dir" && "$(cygpath -u "$SYSTEMROOT")/System32/tar.exe" -a -c -f "$archive_name" "$output_directory_name")
+            fi
+
+            if [ $? -ne 0 ]; then
+                uebs::print_error "Compression failed. The uncompressed build is in \"$output_dir_win\"."
+                explorer "$output_dir_win"
+                exit 1
+            fi
+
             echo "Compression finished"
             echo "You will find the archive in \"$output_dir_win/\"."
 
