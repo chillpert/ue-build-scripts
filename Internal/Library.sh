@@ -769,7 +769,12 @@ uebs::generate_wwise_soundbanks() {
         return 0
     fi
 
-    local wwise_console="/c/Audiokinetic/Wwise${UEBS_WWISE_VERSION}/Authoring/x64/Release/bin/WwiseConsole.exe"
+    # Newer Wwise Launcher versions install to "Wwise_<version>", older ones to "Wwise<version>"
+    local wwise_console="/c/Audiokinetic/Wwise_${UEBS_WWISE_VERSION}/Authoring/x64/Release/bin/WwiseConsole.exe"
+
+    if [ ! -f "$wwise_console" ]; then
+        wwise_console="/c/Audiokinetic/Wwise${UEBS_WWISE_VERSION}/Authoring/x64/Release/bin/WwiseConsole.exe"
+    fi
 
     if [ ! -f "$wwise_console" ]; then
         uebs::print_warning "WwiseConsole.exe not found at: $wwise_console"
