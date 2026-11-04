@@ -476,6 +476,10 @@ uebs::package() {
     uebs::get_platform
     uebs::fetch
 
+    # The cook runs on the editor binaries, so rebuild them in case they are from another branch or commit.
+    # Otherwise cooked Blueprints can mismatch the game's C++ and fail to load ("Bad export index").
+    uebs::build
+
     local is_distributable=$1
     local build_flags=""
 
@@ -754,6 +758,8 @@ uebs::build_lighting() {
 
     uebs::get_platform
     uebs::fetch
+    # The commandlet loads and saves the maps with the editor binaries, so make sure they match the source
+    uebs::build
     local editor_cmd="$engine_path/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
 
     cd "$UEBS_PROJECT_PATH" || return 1
