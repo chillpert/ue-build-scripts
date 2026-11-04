@@ -554,6 +554,329 @@ uebs::package() {
     uebs::print_success "Packaging finished."
 }
 
+# Static lighting is baked with the ResavePackages commandlet. Whether a map needs a bake is a guess: after each
+# bake, the hashes of the persistent .umap and every .umap it references are stored in
+# Saved/BuildLighting/<Map>.stamp. Changes to meshes, materials or lighting settings outside those files are not
+# detected.
+
+lighting_quality_levels=(Preview Medium High Production)
+lighting_selected_maps=()
+lighting_quality=""
+
+# Prints the long package names of the maps in MapsToCook, e.g. /Game/Marmortal/Maps/Menu/MainMenuLevel
+uebs::maps_to_cook() {
+    grep -h '^+MapsToCook=' "$UEBS_PROJECT_PATH/Config/DefaultGame.ini" | sed -E 's/.*FilePath="([^"]+)".*/\1/'
+}
+
+# Param1: a map name like PlayGround or a long package name. Prints the path of its .umap relative to the project.
+uebs::map_file() {
+    local map="$1"
+
+    if [[ "$map" == /Game/* ]]; then
+        echo "Content/${map#/Game/}.umap"
+        return
+    fi
+
+    (cd "$UEBS_PROJECT_PATH" && find Content -name "${map}.umap" -print -quit)
+}
+
+# Param1: the .umap of a persistent level. Prints it and every other .umap it references, such as streaming
+# sublevels and level instances. The references are read from the package's name table.
+uebs::level_files() {
+    local persistent_file="$1"
+
+    echo "$persistent_file"
+    grep -a -o '/Game/[A-Za-z0-9_/]*' "$UEBS_PROJECT_PATH/$persistent_file" | sort -u | while read -r package; do
+        local file="Content/${package#/Game/}.umap"
+        if [ "$file" != "$persistent_file" ] && [ -f "$UEBS_PROJECT_PATH/$file" ]; then
+            echo "$file"
+        fi
+    done
+}
+
+# Param1: the .umap of a persistent level. Prints "<sha1>  <file>" for each of its level files.
+uebs::lighting_fingerprint() {
+    (cd "$UEBS_PROJECT_PATH" && uebs::level_files "$1" | xargs -d '\n' sha1sum)
+}
+
+uebs::lighting_stamp_file() {
+    echo "$UEBS_PROJECT_PATH/Saved/BuildLighting/$(basename "$1" .umap).stamp"
+}
+
+# Param1: the .umap of a persistent level. Prints one line describing whether it changed since its last bake.
+# Returns 0 if it looks unchanged.
+uebs::lighting_status() {
+    local map_file="$1"
+    local map_directory
+    map_directory="$UEBS_PROJECT_PATH/$(dirname "$map_file")"
+    local stamp
+    stamp="$(uebs::lighting_stamp_file "$map_file")"
+
+    if [ ! -f "$UEBS_PROJECT_PATH/$map_file" ]; then
+        echo "map file not found"
+        return 1
+    fi
+
+    if [ ! -f "$stamp" ]; then
+        echo "no bake recorded on this machine"
+        return 1
+    fi
+
+    if [ -z "$(find "$map_directory" -maxdepth 1 -name '*_BuiltData.uasset' -print -quit)" ]; then
+        echo "no built data on disk"
+        return 1
+    fi
+
+    local changed
+    changed="$(uebs::lighting_fingerprint "$map_file" | diff "$stamp" - | grep '^[<>]' | awk '{print $3}' | sort -u | xargs -r -n1 basename | tr '\n' ' ')"
+    if [ -n "$changed" ]; then
+        echo "changed since last bake: $changed"
+        return 1
+    fi
+
+    echo "unchanged since last bake ($(date -r "$stamp" '+%Y-%m-%d %H:%M'))"
+    return 0
+}
+
+uebs::choose_lighting_quality() {
+    local reply
+
+    echo "Lighting quality:"
+    for i in "${!lighting_quality_levels[@]}"; do
+        echo "  $((i + 1))) ${lighting_quality_levels[$i]}"
+    done
+    read -r -p "Choose a quality [2) Medium]: " reply
+    echo
+
+    case "$reply" in
+        "" )
+            lighting_quality="Medium"
+            ;;
+        [1-4] )
+            lighting_quality="${lighting_quality_levels[$((reply - 1))]}"
+            ;;
+        * )
+            uebs::print_error "Unknown lighting quality: $reply"
+            return 1
+            ;;
+    esac
+}
+
+# Lists the cooked maps with their bake status and stores the user's choice in lighting_selected_maps.
+uebs::choose_lighting_maps() {
+    local maps=()
+    local statuses=()
+    local changed=()
+
+    uebs::print_header "Lighting"
+
+    while read -r map; do
+        local map_file status
+        map_file="$(uebs::map_file "$map")"
+        if status="$(uebs::lighting_status "$map_file")"; then
+            changed+=(false)
+        else
+            changed+=(true)
+        fi
+        maps+=("$(basename "$map")")
+        statuses+=("$status")
+    done < <(uebs::maps_to_cook)
+
+    echo "Maps in this build (MapsToCook in Config/DefaultGame.ini):"
+    for i in "${!maps[@]}"; do
+        printf "  %d) %-20s %s\n" "$((i + 1))" "${maps[$i]}" "${statuses[$i]}"
+    done
+    echo
+    uebs::print_warning "These statuses are a guess. They only compare the map's own .umap files with the last bake on this"
+    uebs::print_warning "machine, so a bake may not be needed, and changed meshes, materials or lighting settings are missed."
+    uebs::print_warning "Baking can take a long time and leaves the baked .umap files modified in your working copy."
+    echo
+
+    local reply
+    read -r -p "Bake lighting for: [Enter] none, a) all, c) changed only, or numbers/map names separated by spaces: " reply
+    echo
+
+    lighting_selected_maps=()
+    case "$reply" in
+        "" | [Nn] | none)
+            echo "Skipping the lighting bake."
+            echo
+            return 0
+            ;;
+        [Aa] | all)
+            lighting_selected_maps=("${maps[@]}")
+            ;;
+        [Cc] | changed)
+            for i in "${!maps[@]}"; do
+                if [ "${changed[$i]}" = true ]; then
+                    lighting_selected_maps+=("${maps[$i]}")
+                fi
+            done
+            ;;
+        *)
+            for item in $reply; do
+                if [[ "$item" =~ ^[0-9]+$ ]] && [ "$item" -ge 1 ] && [ "$item" -le ${#maps[@]} ]; then
+                    lighting_selected_maps+=("${maps[$((item - 1))]}")
+                elif [ -n "$(uebs::map_file "$item")" ]; then
+                    lighting_selected_maps+=("$item")
+                else
+                    uebs::print_error "Unknown map: $item"
+                    return 1
+                fi
+            done
+            ;;
+    esac
+
+    if [ ${#lighting_selected_maps[@]} -eq 0 ]; then
+        echo "No maps selected. Skipping the lighting bake."
+        echo
+        return 0
+    fi
+
+    uebs::choose_lighting_quality || return 1
+    echo "Will bake ${lighting_selected_maps[*]} at $lighting_quality quality."
+    echo
+}
+
+# Params: map names. Bakes them in one commandlet run and records their fingerprints. Returns non-zero on failure.
+uebs::build_lighting() {
+    local maps=("$@")
+    if [ ${#maps[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    uebs::print_header "Building lighting ($lighting_quality) for: ${maps[*]}"
+
+    if tasklist 2>/dev/null | grep -qi '^UnrealEditor'; then
+        uebs::print_error "Unreal Engine is running. Close it so the commandlet doesn't fight over the same files."
+        return 1
+    fi
+
+    uebs::get_platform
+    uebs::fetch
+    local editor_cmd="$engine_path/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
+
+    cd "$UEBS_PROJECT_PATH" || return 1
+
+    local level_files=()
+    for map in "${maps[@]}"; do
+        local map_file
+        map_file="$(uebs::map_file "$map")"
+        if [ -z "$map_file" ] || [ ! -f "$map_file" ]; then
+            uebs::print_error "Map not found: $map"
+            return 1
+        fi
+        mapfile -t -O "${#level_files[@]}" level_files < <(uebs::level_files "$map_file")
+    done
+
+    # Lockable files are read-only until locked, and the commandlet skips read-only maps instead of saving them.
+    # Make the level files writable without taking locks. The baked maps are only for this build, so this includes
+    # files locked by someone else.
+    local me others_locked writable_files=()
+    me="$(git config user.name)"
+    others_locked="$(git lfs locks 2>/dev/null | awk -v me="$me" '$2 != me {print $1}')"
+    for file in "${level_files[@]}"; do
+        if [ ! -w "$file" ]; then
+            chmod u+w "$file"
+            writable_files+=("$file")
+        fi
+    done
+
+    # The commandlet can't overwrite existing built data ("cannot be saved as it has only been partially loaded"),
+    # so move it aside and let the bake create it from scratch
+    local backup_directory="$UEBS_PROJECT_PATH/Saved/BuildLighting/BuiltDataBackup"
+    rm -rf "$backup_directory"
+    for file in "${level_files[@]}"; do
+        local built_data="${file%.umap}_BuiltData.uasset"
+        if [ -f "$built_data" ]; then
+            mkdir -p "$backup_directory/$(dirname "$built_data")"
+            mv "$built_data" "$backup_directory/$built_data"
+        fi
+    done
+
+    local start_marker="$UEBS_PROJECT_PATH/Saved/BuildLighting_start"
+    touch "$start_marker"
+    local before_hashes
+    before_hashes="$(sha1sum "${level_files[@]}")"
+
+    local map_arg log_name start status
+    map_arg="$(IFS=+; echo "${maps[*]}")"
+    log_name="BuildLighting_$(date +%Y%m%d_%H%M%S).log"
+    start=$(date +%s)
+
+    # -nosourcecontrol keeps the commandlet from taking LFS locks through the Git plugin
+    "$editor_cmd" "$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -run=ResavePackages \
+        -buildlighting -allowcommandletrendering -quality="$lighting_quality" -map="$map_arg" \
+        -nosourcecontrol -unattended -nopause -nosplash -log="$log_name"
+    status=$?
+
+    local log_file="$UEBS_PROJECT_PATH/Saved/Logs/$log_name"
+    echo
+    echo "Commandlet exited with $status after $(( $(date +%s) - start ))s. Log: $log_file"
+
+    # Put the read-only flag back on files the bake didn't change
+    for file in "${writable_files[@]}"; do
+        if grep -qxF "$(sha1sum "$file")" <<< "$before_hashes"; then
+            chmod u-w "$file"
+        fi
+    done
+
+    # Restore built data the bake didn't recreate, such as for levels without static lighting
+    if [ -d "$backup_directory" ]; then
+        while read -r built_data; do
+            if [ ! -f "$built_data" ]; then
+                mv "$backup_directory/$built_data" "$built_data"
+            fi
+        done < <(cd "$backup_directory" && find Content -type f)
+        rm -rf "$backup_directory"
+    fi
+
+    echo
+    echo "Files the bake saved:"
+    find Content -newer "$start_marker" -type f
+
+    local errors failures
+    errors="$(grep -E 'Error:' "$log_file" 2>/dev/null)"
+    if [ -n "$errors" ]; then
+        echo
+        uebs::print_warning "Errors from the log (the last 20):"
+        tail -20 <<< "$errors"
+    fi
+
+    # Other errors, such as broken asset references, don't stop the bake, so only these count as a failure
+    failures="$(grep -E 'Failed building lighting|Failed to complete steps|Skipping read-only|Failed to save|Failed to check out' "$log_file" 2>/dev/null)"
+
+    local others_changed=()
+    for file in "${level_files[@]}"; do
+        if grep -qxF "$file" <<< "$others_locked" && ! grep -qxF "$(sha1sum "$file")" <<< "$before_hashes"; then
+            others_changed+=("$file")
+        fi
+    done
+    if [ ${#others_changed[@]} -gt 0 ]; then
+        echo
+        uebs::print_warning "The bake saved these maps although someone else has them locked. Don't commit them:"
+        printf '  %s
+' "${others_changed[@]}"
+    fi
+
+    if [ $status -ne 0 ] || [ -n "$failures" ]; then
+        echo
+        uebs::print_error "Lighting bake failed."
+        return 1
+    fi
+
+    mkdir -p "$UEBS_PROJECT_PATH/Saved/BuildLighting"
+    for map in "${maps[@]}"; do
+        local map_file
+        map_file="$(uebs::map_file "$map")"
+        uebs::lighting_fingerprint "$map_file" > "$(uebs::lighting_stamp_file "$map_file")"
+    done
+
+    echo
+    uebs::print_success "Lighting bake finished."
+    echo
+}
+
 uebs::upload_engine_logs() {
     uebs::print_header "Uploading engine log"
 
