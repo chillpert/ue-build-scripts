@@ -430,17 +430,22 @@ uebs::build() {
 
         uebs::print_header "Compiling C++ ..."
 
-        "$ubt_path" Development "$platform" -Project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -TargetType=Editor -Progress -NoEngineChanges -NoHotReloadFromIDE
+        # Mirror the compiler output to a file, since a failed build never reaches the engine log
+        local build_log_file="$UEBS_PROJECT_PATH/Saved/Logs/${UEBS_PROJECT_NAME}_Build.log"
+        mkdir -p "$(dirname "$build_log_file")"
 
-        if [ $? -ne 0 ]; then
+        "$ubt_path" Development "$platform" -Project="$UEBS_PROJECT_PATH/$UEBS_PROJECT_NAME.uproject" -TargetType=Editor -Progress -NoEngineChanges -NoHotReloadFromIDE 2>&1 | tee "$build_log_file"
+        local build_result=${PIPESTATUS[0]}
+
+        if [ "$build_result" -ne 0 ]; then
             echo
             uebs::print_error "Failed to compile $UEBS_PROJECT_NAME."
             echo
 
-            read -p "Do you want to upload your engine log? Press 'y' to confirm or any other key to cancel. " -n 1 -r
+            read -p "Do you want to upload your build log? Press 'y' to confirm or any other key to cancel. " -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
-                uebs::upload_engine_logs
+                uebs::upload_engine_logs "$build_log_file"
                 exit 1
             else
                 exit 1
@@ -892,10 +897,11 @@ uebs::upload_engine_logs() {
         uebs::throw_error "Failed to upload engine log: The branch $UEBS_LOG_BRANCH_NAME does not exist on the remote. Please create it first and try again."
     fi
 
-    log_file="${UEBS_PROJECT_PATH}/Saved/Logs/${UEBS_PROJECT_NAME}.log"
+    # Optional first argument: the log to upload. Defaults to the engine log.
+    log_file="${1:-${UEBS_PROJECT_PATH}/Saved/Logs/${UEBS_PROJECT_NAME}.log}"
 
     if ! [[ -f "$log_file" ]]; then
-        uebs::throw_error "No engine log has been created yet."
+        uebs::throw_error "Log file not found: $log_file"
     fi
 
     # Retrieve GitHub url of game repo
@@ -924,7 +930,7 @@ uebs::upload_engine_logs() {
     mkdir -p "${staging_dir}/Logs"
 
     # Copy the log file
-    cp "$log_file" "${staging_dir}/Logs/${git_user_name}_${local_time}"
+    cp "$log_file" "${staging_dir}/Logs/${git_user_name}_${local_time}_$(basename "$log_file")"
 
     # Enter the directory of the orphan branch
     cd "$staging_dir"
